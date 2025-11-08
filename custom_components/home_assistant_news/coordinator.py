@@ -45,7 +45,8 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
     ) -> dict[str, list[dict[str, str]]]:
         """Fetch data from Google News RSS feeds."""
         if self._session is None:
-            self._session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            from homeassistant.helpers import aiohttp_client
+            self._session = aiohttp_client.async_get_clientsession(self.hass)
 
         results: dict[str, list[dict[str, str]]] = {}
 

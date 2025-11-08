@@ -9,7 +9,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 
 from .const import CATEGORY_MAP, DEFAULTS, DOMAIN
 
@@ -44,10 +44,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Home Assistant News."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -104,12 +100,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     "tts_entity",
                     default=options.get("tts_entity", DEFAULTS["tts_entity"]),
-                ): vol.In(tts_entities) if tts_entities else str,
+                ): vol.In(tts_entities + [""]) if tts_entities else str,
                 vol.Required(
                     "media_players",
                     default=options.get("media_players", DEFAULTS["media_players"]),
                 ): vol.All(
-                    [vol.In(media_player_entities) if media_player_entities else str],
+                    cv.multi_select(media_player_entities) if media_player_entities else [str],
                     vol.Length(min=1),
                 ),
                 vol.Required(
