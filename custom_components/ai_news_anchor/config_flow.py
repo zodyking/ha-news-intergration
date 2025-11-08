@@ -1,4 +1,4 @@
-"""Config flow for AI News Anchor."""
+"""Config flow for Home Assistant News."""
 from __future__ import annotations
 
 import logging
@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for AI News Anchor."""
+    """Handle a config flow for Home Assistant News."""
 
     VERSION = 1
 
@@ -26,7 +26,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle the initial step."""
         if user_input is not None:
-            return self.async_create_entry(title="AI News Anchor", data={})
+            return self.async_create_entry(title="Home Assistant News", data={})
 
         return self.async_show_form(step_id="user")
 
@@ -40,7 +40,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for AI News Anchor."""
+    """Handle options flow for Home Assistant News."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""

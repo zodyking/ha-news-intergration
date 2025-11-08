@@ -1,4 +1,4 @@
-"""Diagnostics support for AI News Anchor."""
+"""Diagnostics support for Home Assistant News."""
 from __future__ import annotations
 
 from typing import Any

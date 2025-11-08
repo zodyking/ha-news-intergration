@@ -1,4 +1,4 @@
-# AI News Anchor
+# Home Assistant News
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![GitHub release](https://img.shields.io/github/release/zodyking/ai_news_anchor.svg)](https://github.com/zodyking/ai_news_anchor)
@@ -33,10 +33,10 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 2. Go to **Integrations**
 3. Click the three dots menu (⋮) → **Custom repositories**
 4. Add this repository URL: `https://github.com/zodyking/ai_news_anchor`
-5. Click **"AI News Anchor"** → **Install**
+5. Click **"Home Assistant News"** → **Install**
 6. Restart Home Assistant
 7. Go to **Settings** → **Devices & Services** → **Add Integration**
-8. Search for "AI News Anchor" and add it
+8. Search for "Home Assistant News" and add it
 
 ### Manual Installation
 
@@ -64,7 +64,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 4. Go to **Settings** → **Devices & Services** → **Add Integration**
 
-5. Search for "AI News Anchor" and add it
+5. Search for "Home Assistant News" and add it
 
 6. Configure the integration via **Panel UI** or **Options**:
    - **Local Geographic Area**: Your location for local news (e.g., "New York, NY")
@@ -83,7 +83,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 The integration includes an intuitive panel interface built with Shoelace web components. Access it by:
 
-1. Clicking on "AI News Anchor" in the sidebar (if enabled)
+1. Clicking on "Home Assistant News" in the sidebar (if enabled)
 2. Or navigating to `/ai_news_anchor` in your browser
 
 The panel allows you to:

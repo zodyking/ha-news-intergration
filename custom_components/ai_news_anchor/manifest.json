@@ -1,6 +1,6 @@
 {
   "domain": "ai_news_anchor",
-  "name": "AI News Anchor",
+  "name": "Home Assistant News",
   "version": "0.1.0",
   "documentation": "https://github.com/zodyking/ai_news_anchor",
   "requirements": [],
@@ -9,7 +9,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "panel": {
-    "name": "AI News Anchor",
+    "name": "Home Assistant News",
     "url_path": "ai_news_anchor",
     "html_url": "/local/ai_news_anchor/panel.html"
   }

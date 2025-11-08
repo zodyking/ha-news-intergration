@@ -1,4 +1,4 @@
-"""Constants for AI News Anchor integration."""
+"""Constants for Home Assistant News integration."""
 from typing import Final
 
 DOMAIN: Final = "ai_news_anchor"

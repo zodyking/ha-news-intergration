@@ -1,4 +1,4 @@
-# AI News Anchor
+# Home Assistant News
 
 A Home Assistant custom integration that generates and plays AI-written news briefings from Google News RSS feeds.
 
@@ -19,10 +19,10 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 2. Go to Integrations
 3. Click the three dots menu (⋮) → Custom repositories
 4. Add this repository URL
-5. Click "AI News Anchor" → Install
+5. Click "Home Assistant News" → Install
 6. Restart Home Assistant
 7. Go to Settings → Devices & Services → Add Integration
-8. Search for "AI News Anchor" and add it
+8. Search for "Home Assistant News" and add it
 
 ### Manual Installation
 
@@ -30,7 +30,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 2. Copy the `www/ai_news_anchor/panel.html` file to your `config/www/ai_news_anchor/` directory
 3. Restart Home Assistant
 4. Go to Settings → Devices & Services → Add Integration
-5. Search for "AI News Anchor" and add it
+5. Search for "Home Assistant News" and add it
 
 ## Requirements
 
@@ -45,8 +45,8 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 After installation, configure the integration via:
 
-1. **Panel UI** (Recommended): Navigate to `/ai_news_anchor` in your browser or click "AI News Anchor" in the sidebar
-2. **Options Flow**: Go to Settings → Devices & Services → AI News Anchor → Configure
+1. **Panel UI** (Recommended): Navigate to `/ai_news_anchor` in your browser or click "Home Assistant News" in the sidebar
+2. **Options Flow**: Go to Settings → Devices & Services → Home Assistant News → Configure
 
 ### Settings
 
@@ -64,7 +64,7 @@ After installation, configure the integration via:
 
 ### Panel UI
 
-Access the intuitive panel interface by clicking "AI News Anchor" in the sidebar or navigating to `/ai_news_anchor`. The panel allows you to:
+Access the intuitive panel interface by clicking "Home Assistant News" in the sidebar or navigating to `/ai_news_anchor`. The panel allows you to:
 - Configure all settings visually
 - Test briefings with the "Play Briefing Now" button
 - See real-time status and error messages

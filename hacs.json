@@ -1,5 +1,5 @@
 {
-  "name": "AI News Anchor",
+  "name": "Home Assistant News",
   "domains": ["ai_news_anchor"],
   "iot_class": "Cloud Polling",
   "homeassistant": "2023.1.0"

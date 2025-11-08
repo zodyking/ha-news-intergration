@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "AI News Anchor",
-        "description": "Set up AI News Anchor to generate and play news briefings."
+        "title": "Home Assistant News",
+        "description": "Set up Home Assistant News to generate and play news briefings."
       }
     },
     "error": {
@@ -11,14 +11,14 @@
       "media_players_required": "At least one media player is required"
     },
     "abort": {
-      "already_configured": "AI News Anchor is already configured"
+      "already_configured": "Home Assistant News is already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "AI News Anchor Options",
-        "description": "Configure AI News Anchor settings.",
+        "title": "Home Assistant News Options",
+        "description": "Configure Home Assistant News settings.",
         "data": {
           "local_geo": "Local Geographic Area",
           "max_per_category": "Max Articles Per Category",

@@ -1,4 +1,4 @@
-"""AI News Anchor integration."""
+"""Home Assistant News integration."""
 from __future__ import annotations
 
 import asyncio
@@ -22,7 +22,7 @@ PLATFORMS: list[str] = []
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the AI News Anchor integration."""
+    """Set up the Home Assistant News integration."""
     hass.data.setdefault(DOMAIN, {})
 
     # Register API endpoints
@@ -33,7 +33,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up AI News Anchor from a config entry."""
+    """Set up Home Assistant News from a config entry."""
     coordinator = NewsCoordinator(
         hass,
         scan_interval=entry.options.get("scan_interval", 1800),
@@ -95,8 +95,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.exception("Error in play_briefing service: %s", err)
             persistent_notification.create(
                 hass,
-                f"AI News Anchor error: {err}",
-                "AI News Anchor",
+                f"Home Assistant News error: {err}",
+                "Home Assistant News",
                 notification_id=f"{DOMAIN}_error",
             )
 
@@ -141,8 +141,8 @@ async def _play_briefing(
     if not tts_entity:
         persistent_notification.create(
             hass,
-            "AI News Anchor: TTS entity not configured. Please configure it in integration options.",
-            "AI News Anchor",
+            "Home Assistant News: TTS entity not configured. Please configure it in integration options.",
+            "Home Assistant News",
             notification_id=f"{DOMAIN}_config_error",
         )
         return
@@ -150,8 +150,8 @@ async def _play_briefing(
     if not media_players:
         persistent_notification.create(
             hass,
-            "AI News Anchor: No media players configured. Please configure at least one in integration options.",
-            "AI News Anchor",
+            "Home Assistant News: No media players configured. Please configure at least one in integration options.",
+            "Home Assistant News",
             notification_id=f"{DOMAIN}_config_error",
         )
         return
@@ -200,8 +200,8 @@ async def _play_briefing(
     if not payload:
         persistent_notification.create(
             hass,
-            "AI News Anchor: No items to brief. Check your enabled categories and RSS feeds.",
-            "AI News Anchor",
+            "Home Assistant News: No items to brief. Check your enabled categories and RSS feeds.",
+            "Home Assistant News",
             notification_id=f"{DOMAIN}_no_items",
         )
         return
@@ -230,8 +230,8 @@ async def _play_briefing(
         error_msg = str(err)
         persistent_notification.create(
             hass,
-            f"AI News Anchor: {error_msg}",
-            "AI News Anchor",
+            f"Home Assistant News: {error_msg}",
+            "Home Assistant News",
             notification_id=f"{DOMAIN}_ai_error",
         )
         _LOGGER.error("AI generation failed: %s", err)
@@ -240,8 +240,8 @@ async def _play_briefing(
     if not script_text or not script_text.strip():
         persistent_notification.create(
             hass,
-            "AI News Anchor: Generated script is empty.",
-            "AI News Anchor",
+            "Home Assistant News: Generated script is empty.",
+            "Home Assistant News",
             notification_id=f"{DOMAIN}_empty_script",
         )
         return
