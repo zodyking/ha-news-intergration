@@ -10,7 +10,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import persistent_notification
+from homeassistant.components import persistent_notification
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
