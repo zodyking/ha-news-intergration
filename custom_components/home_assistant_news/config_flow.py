@@ -62,7 +62,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data=user_input)
 
         # Get current options
-        options = self.config_entry.options or {}
+        config_entry = self._config_entry
+        options = config_entry.options or config_entry.data or {}
 
         # Get available entities
         entity_reg = er.async_get(self.hass)
