@@ -35,9 +35,9 @@ async def async_get_config_entry_diagnostics(
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
-            "last_update_success_time": (
-                coordinator.last_update_success_time.isoformat()
-                if coordinator.last_update_success_time
+            "last_update_time": (
+                coordinator.last_update_time.isoformat()
+                if coordinator.last_update_time
                 else None
             ),
             "last_exception": str(coordinator.last_exception)
