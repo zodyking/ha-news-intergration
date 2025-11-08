@@ -88,6 +88,27 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 ## Usage
 
+### Sensor Entities
+
+The integration creates sensor entities for each news category:
+- `sensor.home_assistant_news_u_s` - U.S. news
+- `sensor.home_assistant_news_world` - World news
+- `sensor.home_assistant_news_local` - Local news
+- `sensor.home_assistant_news_business` - Business news
+- `sensor.home_assistant_news_technology` - Technology news
+- `sensor.home_assistant_news_entertainment` - Entertainment news
+- `sensor.home_assistant_news_sports` - Sports news
+- `sensor.home_assistant_news_science` - Science news
+- `sensor.home_assistant_news_health` - Health news
+
+Each sensor provides:
+- **State**: Number of articles in that category
+- **Attributes**: 
+  - `articles`: List of articles with `title` and `summary`
+  - `article_count`: Total number of articles
+
+You can use these sensors in automations, templates, and dashboards to display news data.
+
 ### Panel UI
 
 The integration includes an intuitive panel interface built with Shoelace web components. Access it by:
@@ -131,6 +152,28 @@ trigger:
 action:
   - service: home_assistant_news.play_briefing
 mode: single
+```
+
+### Using Sensor Entities
+
+You can use the sensor entities in automations and templates:
+
+```yaml
+# Example: Display news count in a template
+{{ states('sensor.home_assistant_news_u_s') }} articles in U.S. news
+
+# Example: Get first article title
+{{ state_attr('sensor.home_assistant_news_world', 'articles')[0].title if state_attr('sensor.home_assistant_news_world', 'articles') else 'No articles' }}
+
+# Example: Automation triggered by new articles
+alias: Notify on New Technology News
+trigger:
+  - platform: state
+    entity_id: sensor.home_assistant_news_technology
+action:
+  - service: notify.mobile_app
+    data:
+      message: "New tech news: {{ state_attr('sensor.home_assistant_news_technology', 'articles')[0].title }}"
 ```
 
 ### Multiple Times Per Day

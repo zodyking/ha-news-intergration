@@ -18,7 +18,7 @@ from .coordinator import NewsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = []
+PLATFORMS: list[str] = ["sensor"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -58,6 +58,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    # Forward entry setup to sensor platform
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Start initial fetch
     await coordinator.async_config_entry_first_refresh()
@@ -109,9 +112,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    hass.data[DOMAIN].pop(entry.entry_id)
-    hass.services.async_remove(DOMAIN, "play_briefing")
-    return True
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.services.async_remove(DOMAIN, "play_briefing")
+    return unload_ok
 
 
 async def _play_briefing(
