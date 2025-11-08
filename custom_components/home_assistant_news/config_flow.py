@@ -66,31 +66,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             }
             user_input["enabled_categories"] = enabled_categories_dict
             
-            # Validate
-            if not user_input.get("tts_entity"):
-                errors["base"] = "tts_entity_required"
-            elif not user_input.get("media_players"):
-                errors["base"] = "media_players_required"
-            else:
-                # Save options
-                return self.async_create_entry(title="", data=user_input)
+            # Save options (no validation needed - just AI setup)
+            return self.async_create_entry(title="", data=user_input)
 
         # Get current options
         config_entry = self.config_entry
         options = config_entry.options or config_entry.data or {}
-
-        # Get available entities
-        entity_reg = er.async_get(self.hass)
-        tts_entities = [
-            entity.entity_id
-            for entity in entity_reg.entities.values()
-            if entity.domain == "tts"
-        ]
-        media_player_entities = [
-            entity.entity_id
-            for entity in entity_reg.entities.values()
-            if entity.domain == "media_player"
-        ]
 
         # Build enabled categories dict
         enabled_categories = options.get(
@@ -113,17 +94,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     default=options.get("scan_interval", DEFAULTS["scan_interval"]),
                 ): vol.All(vol.Coerce(int), vol.Range(min=600, max=7200)),
                 vol.Required(
-                    "tts_entity",
-                    default=options.get("tts_entity", DEFAULTS["tts_entity"]),
-                ): vol.In(tts_entities + [""]) if tts_entities else str,
-                vol.Required(
-                    "media_players",
-                    default=options.get("media_players", DEFAULTS["media_players"]),
-                ): vol.All(
-                    cv.multi_select(media_player_entities) if media_player_entities else [str],
-                    vol.Length(min=1),
-                ),
-                vol.Required(
                     "ai_mode",
                     default=options.get("ai_mode", DEFAULTS["ai_mode"]),
                 ): vol.In(["auto", "google_generative_ai_conversation", "conversation"]),
@@ -131,10 +101,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "conversation_agent_id",
                     default=options.get("conversation_agent_id", DEFAULTS["conversation_agent_id"]),
                 ): str,
-                vol.Required(
-                    "preroll_ms",
-                    default=options.get("preroll_ms", DEFAULTS["preroll_ms"]),
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=300)),
                 # Flatten enabled_categories to avoid nested schema serialization issues
                 vol.Optional(
                     "category_u_s",

@@ -27,11 +27,10 @@ async def async_get_config_entry_diagnostics(
             "scan_interval": options.get("scan_interval"),
             "max_per_category": options.get("max_per_category"),
             "local_geo": options.get("local_geo"),
-            "tts_entity": options.get("tts_entity"),
-            "media_players": options.get("media_players", []),
             "ai_mode": options.get("ai_mode"),
-            "preroll_ms": options.get("preroll_ms"),
+            "conversation_agent_id": options.get("conversation_agent_id"),
             "enabled_categories": options.get("enabled_categories", {}),
+            "custom_sources": options.get("custom_sources", []),
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,

@@ -133,7 +133,6 @@
     class AINewsAnchorPanel {
       constructor() {
         this.config = {};
-        this.entities = { tts: [], media_players: [] };
         this.loading = false;
         this.saving = false;
         this.error = null;
@@ -157,7 +156,6 @@
         }
 
         await this.loadConfig();
-        await this.loadEntities();
         this.render();
       }
 
@@ -174,17 +172,6 @@
           this.error = `Error loading config: ${err.message}`;
         } finally {
           this.loading = false;
-        }
-      }
-
-      async loadEntities() {
-        try {
-          const response = await fetch('/api/home_assistant_news/entities');
-          if (response.ok) {
-            this.entities = await response.json();
-          }
-        } catch (err) {
-          console.error('Error loading entities:', err);
         }
       }
 
@@ -220,31 +207,6 @@
         }
       }
 
-      async playBriefing() {
-        try {
-          this.loading = true;
-          this.error = null;
-
-          if (this.hass) {
-            await this.hass.callService('home_assistant_news', 'play_briefing');
-          } else {
-            await fetch('/api/services/home_assistant_news/play_briefing', {
-              method: 'POST',
-            });
-          }
-
-          this.success = true;
-          setTimeout(() => {
-            this.success = false;
-            this.render();
-          }, 3000);
-        } catch (err) {
-          this.error = `Error playing briefing: ${err.message}`;
-        } finally {
-          this.loading = false;
-          this.render();
-        }
-      }
 
       async refreshData() {
         try {
@@ -376,50 +338,10 @@
           </div>
 
           <div class="card">
-            <div class="card-header">TTS & Media Players</div>
-
-            <div class="form-group">
-              <label>TTS Entity</label>
-              <sl-select
-                .value=${this.config.tts_entity || ''}
-                @sl-change=${(e) => this.updateConfig('tts_entity', e.target.value)}
-              >
-                ${this.entities.tts.map(entity => html`
-                  <sl-option value="${entity}">${entity}</sl-option>
-                `)}
-              </sl-select>
-              <div class="info-text">Select the TTS entity to use for speech</div>
+            <div class="card-header">AI Configuration</div>
+            <div class="info-text" style="margin-bottom: 16px;">
+              Configure which AI service to use for news summarization. The integration will use your installed AI integrations.
             </div>
-
-            <div class="form-group">
-              <label>Media Players</label>
-              <sl-select
-                multiple
-                .value=${this.config.media_players || []}
-                @sl-change=${(e) => this.updateConfig('media_players', Array.isArray(e.target.value) ? e.target.value : [e.target.value])}
-              >
-                ${this.entities.media_players.map(entity => html`
-                  <sl-option value="${entity}">${entity}</sl-option>
-                `)}
-              </sl-select>
-              <div class="info-text">Select one or more media players to play briefings</div>
-            </div>
-
-            <div class="form-group">
-              <label>Pre-roll Delay (milliseconds)</label>
-              <sl-input
-                type="number"
-                min="0"
-                max="300"
-                .value=${String(this.config.preroll_ms || 150)}
-                @sl-input=${(e) => this.updateConfig('preroll_ms', parseInt(e.target.value))}
-              ></sl-input>
-              <div class="info-text">Delay before speaking on each media player (0-300ms)</div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">AI Settings</div>
 
             <div class="form-group">
               <label>AI Mode</label>
@@ -431,7 +353,7 @@
                 <sl-option value="google_generative_ai_conversation">Google Generative AI</sl-option>
                 <sl-option value="conversation">Conversation Agent</sl-option>
               </sl-select>
-              <div class="info-text">Select which AI service to use for script generation</div>
+              <div class="info-text">Select which AI service to use for news summarization</div>
             </div>
 
             ${this.config.ai_mode === 'conversation' ? html`
@@ -439,10 +361,10 @@
                 <label>Conversation Agent ID</label>
                 <sl-input
                   .value=${this.config.conversation_agent_id || ''}
-                  placeholder="Enter agent ID"
+                  placeholder="Enter conversation agent ID"
                   @sl-input=${(e) => this.updateConfig('conversation_agent_id', e.target.value)}
                 ></sl-input>
-                <div class="info-text">Required when using Conversation Agent mode</div>
+                <div class="info-text">Enter the ID of your conversation agent (not to be confused with AI integrations like Google Generative AI)</div>
               </div>
             ` : ''}
           </div>
@@ -450,7 +372,7 @@
           <div class="card">
             <div class="card-header">News Categories</div>
             <div class="info-text" style="margin-bottom: 12px">
-              Select which news categories to include in briefings
+              Select which preset news categories to fetch and display as sensor entities
             </div>
             <div class="categories-grid">
               ${Object.keys(this.config.enabled_categories || {}).map(category => html`
@@ -525,19 +447,11 @@
             </sl-button>
             <sl-button
               variant="primary"
-              @click=${() => this.playBriefing()}
-              .loading=${this.loading}
-            >
-              <sl-icon slot="prefix" name="play-circle"></sl-icon>
-              Play Briefing Now
-            </sl-button>
-            <sl-button
-              variant="primary"
               @click=${() => this.saveConfig()}
               .loading=${this.saving}
             >
               <sl-icon slot="prefix" name="save"></sl-icon>
-              Save Settings
+              Save Configuration
             </sl-button>
           </div>
         `, content);
