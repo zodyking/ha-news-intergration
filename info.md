@@ -27,7 +27,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 ### Manual Installation
 
 1. Copy the `home_assistant_news` folder to your `config/custom_components/` directory
-2. Copy the `www/home_assistant_news/panel.html` file to your `config/www/home_assistant_news/` directory
+2. Copy the `www/home_assistant_news/panel.html` file from the integration folder to your `config/www/home_assistant_news/` directory
 3. Restart Home Assistant
 4. Go to Settings → Devices & Services → Add Integration
 5. Search for "Home Assistant News" and add it

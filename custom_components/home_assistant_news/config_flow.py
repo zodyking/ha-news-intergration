@@ -52,6 +52,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            # Convert flattened category fields back to nested dict
+            enabled_categories_dict = {
+                "U.S.": user_input.pop("category_u_s", True),
+                "World": user_input.pop("category_world", True),
+                "Local": user_input.pop("category_local", True),
+                "Business": user_input.pop("category_business", True),
+                "Technology": user_input.pop("category_technology", True),
+                "Entertainment": user_input.pop("category_entertainment", True),
+                "Sports": user_input.pop("category_sports", True),
+                "Science": user_input.pop("category_science", True),
+                "Health": user_input.pop("category_health", True),
+            }
+            user_input["enabled_categories"] = enabled_categories_dict
+            
             # Validate
             if not user_input.get("tts_entity"):
                 errors["base"] = "tts_entity_required"
@@ -121,22 +135,43 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "preroll_ms",
                     default=options.get("preroll_ms", DEFAULTS["preroll_ms"]),
                 ): vol.All(vol.Coerce(int), vol.Range(min=0, max=300)),
-                vol.Required(
-                    "enabled_categories",
-                    default=enabled_categories,
-                ): vol.Schema(
-                    {
-                        vol.Optional("U.S.", default=enabled_categories.get("U.S.", True)): bool,
-                        vol.Optional("World", default=enabled_categories.get("World", True)): bool,
-                        vol.Optional("Local", default=enabled_categories.get("Local", True)): bool,
-                        vol.Optional("Business", default=enabled_categories.get("Business", True)): bool,
-                        vol.Optional("Technology", default=enabled_categories.get("Technology", True)): bool,
-                        vol.Optional("Entertainment", default=enabled_categories.get("Entertainment", True)): bool,
-                        vol.Optional("Sports", default=enabled_categories.get("Sports", True)): bool,
-                        vol.Optional("Science", default=enabled_categories.get("Science", True)): bool,
-                        vol.Optional("Health", default=enabled_categories.get("Health", True)): bool,
-                    }
-                ),
+                # Flatten enabled_categories to avoid nested schema serialization issues
+                vol.Optional(
+                    "category_u_s",
+                    default=enabled_categories.get("U.S.", True),
+                ): bool,
+                vol.Optional(
+                    "category_world",
+                    default=enabled_categories.get("World", True),
+                ): bool,
+                vol.Optional(
+                    "category_local",
+                    default=enabled_categories.get("Local", True),
+                ): bool,
+                vol.Optional(
+                    "category_business",
+                    default=enabled_categories.get("Business", True),
+                ): bool,
+                vol.Optional(
+                    "category_technology",
+                    default=enabled_categories.get("Technology", True),
+                ): bool,
+                vol.Optional(
+                    "category_entertainment",
+                    default=enabled_categories.get("Entertainment", True),
+                ): bool,
+                vol.Optional(
+                    "category_sports",
+                    default=enabled_categories.get("Sports", True),
+                ): bool,
+                vol.Optional(
+                    "category_science",
+                    default=enabled_categories.get("Science", True),
+                ): bool,
+                vol.Optional(
+                    "category_health",
+                    default=enabled_categories.get("Health", True),
+                ): bool,
             }
         )
 
