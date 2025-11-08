@@ -1,0 +1,7 @@
+# HACS ignore file
+.github/
+*.md
+!README.md
+!info.md
+
+

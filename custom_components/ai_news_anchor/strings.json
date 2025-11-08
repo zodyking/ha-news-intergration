@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI News Anchor",
+        "description": "Set up AI News Anchor to generate and play news briefings."
+      }
+    },
+    "error": {
+      "tts_entity_required": "TTS entity is required",
+      "media_players_required": "At least one media player is required"
+    },
+    "abort": {
+      "already_configured": "AI News Anchor is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI News Anchor Options",
+        "description": "Configure AI News Anchor settings.",
+        "data": {
+          "local_geo": "Local Geographic Area",
+          "max_per_category": "Max Articles Per Category",
+          "scan_interval": "Scan Interval (seconds)",
+          "tts_entity": "TTS Entity",
+          "media_players": "Media Players",
+          "ai_mode": "AI Mode",
+          "conversation_agent_id": "Conversation Agent ID",
+          "preroll_ms": "Pre-roll Delay (ms)",
+          "enabled_categories": "Enabled Categories"
+        }
+      }
+    }
+  }
+}
+

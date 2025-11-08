@@ -1,0 +1,363 @@
+"""AI News Anchor integration."""
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import timedelta
+
+from aiohttp import web
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import persistent_notification
+from homeassistant.util import dt as dt_util
+
+from .const import DOMAIN
+from .coordinator import NewsCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[str] = []
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the AI News Anchor integration."""
+    hass.data.setdefault(DOMAIN, {})
+
+    # Register API endpoints
+    hass.http.register_view(AINewsAnchorConfigView)
+    hass.http.register_view(AINewsAnchorEntitiesView)
+
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up AI News Anchor from a config entry."""
+    coordinator = NewsCoordinator(
+        hass,
+        scan_interval=entry.options.get("scan_interval", 1800),
+        max_per_category=entry.options.get("max_per_category", 2),
+        local_geo=entry.options.get("local_geo", "New York, NY"),
+        enabled_categories=entry.options.get(
+            "enabled_categories",
+            {
+                "U.S.": True,
+                "World": True,
+                "Local": True,
+                "Business": True,
+                "Technology": True,
+                "Entertainment": True,
+                "Sports": True,
+                "Science": True,
+                "Health": True,
+            },
+        ),
+    )
+
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    # Start initial fetch
+    await coordinator.async_config_entry_first_refresh()
+
+    # Update coordinator when options change
+    async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Handle options update."""
+        coordinator._max_per_category = entry.options.get("max_per_category", 2)
+        coordinator._local_geo = entry.options.get("local_geo", "New York, NY")
+        coordinator._enabled_categories = entry.options.get(
+            "enabled_categories",
+            {
+                "U.S.": True,
+                "World": True,
+                "Local": True,
+                "Business": True,
+                "Technology": True,
+                "Entertainment": True,
+                "Sports": True,
+                "Science": True,
+                "Health": True,
+            },
+        )
+        coordinator.update_interval = timedelta(
+            seconds=entry.options.get("scan_interval", 1800)
+        )
+        await coordinator.async_request_refresh()
+
+    entry.async_on_unload(entry.add_update_listener(update_listener))
+
+    # Register service
+    async def handle_play_briefing(call: ServiceCall) -> None:
+        """Handle the play_briefing service call."""
+        try:
+            await _play_briefing(hass, entry, call)
+        except Exception as err:
+            _LOGGER.exception("Error in play_briefing service: %s", err)
+            persistent_notification.create(
+                hass,
+                f"AI News Anchor error: {err}",
+                "AI News Anchor",
+                notification_id=f"{DOMAIN}_error",
+            )
+
+    hass.services.async_register(DOMAIN, "play_briefing", handle_play_briefing)
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    hass.data[DOMAIN].pop(entry.entry_id)
+    hass.services.async_remove(DOMAIN, "play_briefing")
+    return True
+
+
+async def _play_briefing(
+    hass: HomeAssistant, entry: ConfigEntry, call: ServiceCall
+) -> None:
+    """Play a news briefing."""
+    from .summarizer import async_generate_briefing
+
+    coordinator: NewsCoordinator = hass.data[DOMAIN][entry.entry_id]
+
+    # Update options from service call
+    max_per_category = call.data.get(
+        "override_max_per_category",
+        entry.options.get("max_per_category", 2),
+    )
+    media_players = call.data.get(
+        "override_media_players",
+        entry.options.get("media_players", []),
+    )
+    preroll_ms = call.data.get(
+        "override_preroll_ms",
+        entry.options.get("preroll_ms", 150),
+    )
+    tts_entity = entry.options.get("tts_entity", "")
+    ai_mode = entry.options.get("ai_mode", "auto")
+    agent_id = entry.options.get("conversation_agent_id", "")
+
+    # Validate required settings
+    if not tts_entity:
+        persistent_notification.create(
+            hass,
+            "AI News Anchor: TTS entity not configured. Please configure it in integration options.",
+            "AI News Anchor",
+            notification_id=f"{DOMAIN}_config_error",
+        )
+        return
+
+    if not media_players:
+        persistent_notification.create(
+            hass,
+            "AI News Anchor: No media players configured. Please configure at least one in integration options.",
+            "AI News Anchor",
+            notification_id=f"{DOMAIN}_config_error",
+        )
+        return
+
+    # Check if data is stale and refresh if needed
+    scan_interval = entry.options.get("scan_interval", 1800)
+    if coordinator.last_update_success:
+        last_update = coordinator.last_update_success_time
+        if last_update:
+            age = (dt_util.utcnow() - last_update).total_seconds()
+            if age > scan_interval:
+                _LOGGER.info("Data is stale (%.0f seconds old), refreshing", age)
+                await coordinator.async_request_refresh()
+
+    # Get current data
+    data = coordinator.data
+
+    # Build ordered category list
+    category_order = [
+        "U.S.",
+        "World",
+        "Local",
+        "Business",
+        "Technology",
+        "Entertainment",
+        "Sports",
+        "Science",
+        "Health",
+    ]
+
+    # Build JSON payload with only categories that have articles
+    payload = []
+    for category in category_order:
+        if category in data and data[category]:
+            articles = data[category][:max_per_category]
+            payload.append(
+                {
+                    "category": category,
+                    "articles": [
+                        {"title": art["title"], "summary": art["summary"]}
+                        for art in articles
+                    ],
+                }
+            )
+
+    if not payload:
+        persistent_notification.create(
+            hass,
+            "AI News Anchor: No items to brief. Check your enabled categories and RSS feeds.",
+            "AI News Anchor",
+            notification_id=f"{DOMAIN}_no_items",
+        )
+        return
+
+    # Determine greeting based on local time
+    now = dt_util.now()
+    hour = now.hour
+    if 5 <= hour < 12:
+        greeting = "morning"
+    elif 12 <= hour < 18:
+        greeting = "afternoon"
+    else:
+        greeting = "night"
+
+    # Generate script
+    try:
+        script_text = await async_generate_briefing(
+            hass,
+            payload,
+            greeting,
+            max_per_category,
+            ai_mode,
+            agent_id,
+        )
+    except RuntimeError as err:
+        error_msg = str(err)
+        persistent_notification.create(
+            hass,
+            f"AI News Anchor: {error_msg}",
+            "AI News Anchor",
+            notification_id=f"{DOMAIN}_ai_error",
+        )
+        _LOGGER.error("AI generation failed: %s", err)
+        return
+
+    if not script_text or not script_text.strip():
+        persistent_notification.create(
+            hass,
+            "AI News Anchor: Generated script is empty.",
+            "AI News Anchor",
+            notification_id=f"{DOMAIN}_empty_script",
+        )
+        return
+
+    # Play on each media player
+    for player in media_players:
+        try:
+            # Pre-roll delay
+            if preroll_ms > 0:
+                await asyncio.sleep(preroll_ms / 1000.0)
+
+            # Call TTS service
+            await hass.services.async_call(
+                "tts",
+                "speak",
+                {
+                    "entity_id": tts_entity,
+                    "media_player_entity_id": player,
+                    "cache": False,
+                    "message": script_text,
+                },
+                blocking=True,
+            )
+            _LOGGER.info("Playing briefing on %s", player)
+        except Exception as err:
+            _LOGGER.error("Error playing on %s: %s", player, err)
+
+
+class AINewsAnchorConfigView(HomeAssistantView):
+    """View to handle config API requests."""
+
+    url = "/api/ai_news_anchor/config"
+    name = "api:ai_news_anchor:config"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        """Get current configuration."""
+        hass: HomeAssistant = request.app["hass"]
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries:
+            return self.json({"error": "No config entry found"}, status_code=404)
+
+        entry = entries[0]
+        config = {
+            "entry_id": entry.entry_id,
+            "local_geo": entry.options.get("local_geo", "New York, NY"),
+            "max_per_category": entry.options.get("max_per_category", 2),
+            "scan_interval": entry.options.get("scan_interval", 1800),
+            "tts_entity": entry.options.get("tts_entity", ""),
+            "media_players": entry.options.get("media_players", []),
+            "ai_mode": entry.options.get("ai_mode", "auto"),
+            "conversation_agent_id": entry.options.get("conversation_agent_id", ""),
+            "preroll_ms": entry.options.get("preroll_ms", 150),
+            "enabled_categories": entry.options.get(
+                "enabled_categories",
+                {
+                    "U.S.": True,
+                    "World": True,
+                    "Local": True,
+                    "Business": True,
+                    "Technology": True,
+                    "Entertainment": True,
+                    "Sports": True,
+                    "Science": True,
+                    "Health": True,
+                },
+            ),
+        }
+        return self.json(config)
+
+    async def post(self, request: web.Request) -> web.Response:
+        """Update configuration."""
+        hass: HomeAssistant = request.app["hass"]
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries:
+            return self.json({"error": "No config entry found"}, status_code=404)
+
+        entry = entries[0]
+        data = await request.json()
+
+        try:
+            # Update options
+            hass.config_entries.async_update_entry(entry, options=data)
+            return self.json({"success": True})
+        except Exception as err:
+            _LOGGER.exception("Error updating config: %s", err)
+            return self.json({"error": str(err)}, status_code=400)
+
+
+class AINewsAnchorEntitiesView(HomeAssistantView):
+    """View to get available entities."""
+
+    url = "/api/ai_news_anchor/entities"
+    name = "api:ai_news_anchor:entities"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        """Get available TTS and media player entities."""
+        hass: HomeAssistant = request.app["hass"]
+        entity_reg = er.async_get(hass)
+
+        tts_entities = [
+            entity.entity_id
+            for entity in entity_reg.entities.values()
+            if entity.domain == "tts"
+        ]
+        media_player_entities = [
+            entity.entity_id
+            for entity in entity_reg.entities.values()
+            if entity.domain == "media_player"
+        ]
+
+        return self.json(
+            {
+                "tts": sorted(tts_entities),
+                "media_players": sorted(media_player_entities),
+            }
+        )
+

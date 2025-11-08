@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AI News Anchor</title>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace-autoloader.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      background: var(--sl-color-neutral-50);
+    }
+    #root {
+      min-height: 100vh;
+      padding: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      font-weight: 400;
+      color: var(--sl-color-neutral-900);
+    }
+    .header p {
+      margin: 0;
+      color: var(--sl-color-neutral-600);
+    }
+    .card {
+      background: var(--sl-color-neutral-0);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .card-header {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--sl-color-neutral-900);
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--sl-color-neutral-900);
+    }
+    .form-group sl-input,
+    .form-group sl-select,
+    .form-group sl-textarea {
+      width: 100%;
+    }
+    .form-group sl-checkbox {
+      margin-right: 8px;
+    }
+    .categories-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .category-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border-radius: 6px;
+      background: var(--sl-color-neutral-100);
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      justify-content: flex-end;
+    }
+    .status-message {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .status-message.error {
+      background: var(--sl-color-danger-100);
+      color: var(--sl-color-danger-700);
+      border: 1px solid var(--sl-color-danger-300);
+    }
+    .status-message.success {
+      background: var(--sl-color-success-100);
+      color: var(--sl-color-success-700);
+      border: 1px solid var(--sl-color-success-300);
+    }
+    .info-text {
+      font-size: 12px;
+      color: var(--sl-color-neutral-600);
+      margin-top: 4px;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div class="header">
+      <h1>AI News Anchor</h1>
+      <p>Configure your news briefing settings</p>
+    </div>
+
+    <div id="status-container"></div>
+
+    <div id="content">
+      <div class="loading">
+        <sl-spinner style="font-size: 2rem;"></sl-spinner>
+        <p>Loading configuration...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { html, render } from 'https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js';
+
+    class AINewsAnchorPanel {
+      constructor() {
+        this.config = {};
+        this.entities = { tts: [], media_players: [] };
+        this.loading = false;
+        this.saving = false;
+        this.error = null;
+        this.success = false;
+        this.hass = null;
+      }
+
+      async init() {
+        // Get Home Assistant instance
+        if (window.hassConnection) {
+          this.hass = await window.hassConnection;
+        } else {
+          // Fallback: try to get from parent
+          try {
+            this.hass = window.parent.hass || window.hass;
+          } catch (e) {
+            console.error('Could not get hass instance:', e);
+          }
+        }
+
+        await this.loadConfig();
+        await this.loadEntities();
+        this.render();
+      }
+
+      async loadConfig() {
+        try {
+          this.loading = true;
+          const response = await fetch('/api/ai_news_anchor/config');
+          if (response.ok) {
+            this.config = await response.json();
+          } else {
+            this.error = 'Failed to load configuration';
+          }
+        } catch (err) {
+          this.error = `Error loading config: ${err.message}`;
+        } finally {
+          this.loading = false;
+        }
+      }
+
+      async loadEntities() {
+        try {
+          const response = await fetch('/api/ai_news_anchor/entities');
+          if (response.ok) {
+            this.entities = await response.json();
+          }
+        } catch (err) {
+          console.error('Error loading entities:', err);
+        }
+      }
+
+      async saveConfig() {
+        try {
+          this.saving = true;
+          this.error = null;
+          this.success = false;
+
+          const response = await fetch('/api/ai_news_anchor/config', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(this.config),
+          });
+
+          if (response.ok) {
+            this.success = true;
+            setTimeout(() => {
+              this.success = false;
+              this.render();
+            }, 3000);
+          } else {
+            const error = await response.json();
+            this.error = error.message || 'Failed to save configuration';
+          }
+        } catch (err) {
+          this.error = `Error saving config: ${err.message}`;
+        } finally {
+          this.saving = false;
+          this.render();
+        }
+      }
+
+      async playBriefing() {
+        try {
+          this.loading = true;
+          this.error = null;
+
+          if (this.hass) {
+            await this.hass.callService('ai_news_anchor', 'play_briefing');
+          } else {
+            await fetch('/api/services/ai_news_anchor/play_briefing', {
+              method: 'POST',
+            });
+          }
+
+          this.success = true;
+          setTimeout(() => {
+            this.success = false;
+            this.render();
+          }, 3000);
+        } catch (err) {
+          this.error = `Error playing briefing: ${err.message}`;
+        } finally {
+          this.loading = false;
+          this.render();
+        }
+      }
+
+      updateConfig(key, value) {
+        this.config = { ...this.config, [key]: value };
+        this.render();
+      }
+
+      updateCategory(category, enabled) {
+        const enabled_categories = { ...this.config.enabled_categories };
+        enabled_categories[category] = enabled;
+        this.config = { ...this.config, enabled_categories };
+        this.render();
+      }
+
+      render() {
+        const root = document.getElementById('root');
+        const statusContainer = document.getElementById('status-container');
+        const content = document.getElementById('content');
+
+        if (this.loading && !this.config.entry_id) {
+          render(html`
+            <div class="loading">
+              <sl-spinner style="font-size: 2rem;"></sl-spinner>
+              <p>Loading configuration...</p>
+            </div>
+          `, content);
+          return;
+        }
+
+        render(html`
+          ${this.error ? html`
+            <div class="status-message error">
+              <sl-icon name="exclamation-triangle" style="margin-right: 8px;"></sl-icon>
+              ${this.error}
+            </div>
+          ` : ''}
+          ${this.success ? html`
+            <div class="status-message success">
+              <sl-icon name="check-circle" style="margin-right: 8px;"></sl-icon>
+              Settings saved successfully!
+            </div>
+          ` : ''}
+        `, statusContainer);
+
+        render(html`
+          <div class="card">
+            <div class="card-header">Basic Settings</div>
+
+            <div class="form-group">
+              <label>Local Geographic Area</label>
+              <sl-input
+                .value=${this.config.local_geo || ''}
+                placeholder="e.g., New York, NY"
+                @sl-input=${(e) => this.updateConfig('local_geo', e.target.value)}
+              ></sl-input>
+              <div class="info-text">Location for local news feed</div>
+            </div>
+
+            <div class="form-group">
+              <label>Max Articles Per Category</label>
+              <sl-input
+                type="number"
+                min="1"
+                max="3"
+                .value=${String(this.config.max_per_category || 2)}
+                @sl-input=${(e) => this.updateConfig('max_per_category', parseInt(e.target.value))}
+              ></sl-input>
+              <div class="info-text">Number of articles to include per category (1-3)</div>
+            </div>
+
+            <div class="form-group">
+              <label>Scan Interval (seconds)</label>
+              <sl-input
+                type="number"
+                min="600"
+                max="7200"
+                .value=${String(this.config.scan_interval || 1800)}
+                @sl-input=${(e) => this.updateConfig('scan_interval', parseInt(e.target.value))}
+              ></sl-input>
+              <div class="info-text">How often to fetch news (600-7200 seconds)</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">TTS & Media Players</div>
+
+            <div class="form-group">
+              <label>TTS Entity</label>
+              <sl-select
+                .value=${this.config.tts_entity || ''}
+                @sl-change=${(e) => this.updateConfig('tts_entity', e.target.value)}
+              >
+                ${this.entities.tts.map(entity => html`
+                  <sl-option value="${entity}">${entity}</sl-option>
+                `)}
+              </sl-select>
+              <div class="info-text">Select the TTS entity to use for speech</div>
+            </div>
+
+            <div class="form-group">
+              <label>Media Players</label>
+              <sl-select
+                multiple
+                .value=${this.config.media_players || []}
+                @sl-change=${(e) => this.updateConfig('media_players', Array.isArray(e.target.value) ? e.target.value : [e.target.value])}
+              >
+                ${this.entities.media_players.map(entity => html`
+                  <sl-option value="${entity}">${entity}</sl-option>
+                `)}
+              </sl-select>
+              <div class="info-text">Select one or more media players to play briefings</div>
+            </div>
+
+            <div class="form-group">
+              <label>Pre-roll Delay (milliseconds)</label>
+              <sl-input
+                type="number"
+                min="0"
+                max="300"
+                .value=${String(this.config.preroll_ms || 150)}
+                @sl-input=${(e) => this.updateConfig('preroll_ms', parseInt(e.target.value))}
+              ></sl-input>
+              <div class="info-text">Delay before speaking on each media player (0-300ms)</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">AI Settings</div>
+
+            <div class="form-group">
+              <label>AI Mode</label>
+              <sl-select
+                .value=${this.config.ai_mode || 'auto'}
+                @sl-change=${(e) => this.updateConfig('ai_mode', e.target.value)}
+              >
+                <sl-option value="auto">Auto (prefer Google Generative AI)</sl-option>
+                <sl-option value="google_generative_ai_conversation">Google Generative AI</sl-option>
+                <sl-option value="conversation">Conversation Agent</sl-option>
+              </sl-select>
+              <div class="info-text">Select which AI service to use for script generation</div>
+            </div>
+
+            ${this.config.ai_mode === 'conversation' ? html`
+              <div class="form-group">
+                <label>Conversation Agent ID</label>
+                <sl-input
+                  .value=${this.config.conversation_agent_id || ''}
+                  placeholder="Enter agent ID"
+                  @sl-input=${(e) => this.updateConfig('conversation_agent_id', e.target.value)}
+                ></sl-input>
+                <div class="info-text">Required when using Conversation Agent mode</div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="card">
+            <div class="card-header">News Categories</div>
+            <div class="info-text" style="margin-bottom: 12px">
+              Select which news categories to include in briefings
+            </div>
+            <div class="categories-grid">
+              ${Object.keys(this.config.enabled_categories || {}).map(category => html`
+                <div class="category-item">
+                  <sl-checkbox
+                    .checked=${this.config.enabled_categories?.[category] || false}
+                    @sl-change=${(e) => this.updateCategory(category, e.target.checked)}
+                  >
+                    ${category}
+                  </sl-checkbox>
+                </div>
+              `)}
+            </div>
+          </div>
+
+          <div class="actions">
+            <sl-button
+              variant="primary"
+              @click=${() => this.playBriefing()}
+              .loading=${this.loading}
+            >
+              <sl-icon slot="prefix" name="play-circle"></sl-icon>
+              Play Briefing Now
+            </sl-button>
+            <sl-button
+              variant="primary"
+              @click=${() => this.saveConfig()}
+              .loading=${this.saving}
+            >
+              <sl-icon slot="prefix" name="save"></sl-icon>
+              Save Settings
+            </sl-button>
+          </div>
+        `, content);
+      }
+    }
+
+    const panel = new AINewsAnchorPanel();
+    panel.init();
+  </script>
+</body>
+</html>
+
+
