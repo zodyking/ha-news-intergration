@@ -142,16 +142,18 @@
       }
 
       async init() {
-        // Get Home Assistant instance
-        if (window.hassConnection) {
-          this.hass = await window.hassConnection;
-        } else {
-          // Fallback: try to get from parent
-          try {
-            this.hass = window.parent.hass || window.hass;
-          } catch (e) {
-            console.error('Could not get hass instance:', e);
+        // Get Home Assistant instance - panels are loaded in an iframe
+        try {
+          // Try to get from parent window (panel iframe)
+          if (window.parent && window.parent.hass) {
+            this.hass = window.parent.hass;
+          } else if (window.hass) {
+            this.hass = window.hass;
+          } else if (window.hassConnection) {
+            this.hass = await window.hassConnection;
           }
+        } catch (e) {
+          console.error('Could not get hass instance:', e);
         }
 
         await this.loadConfig();

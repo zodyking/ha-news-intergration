@@ -325,8 +325,34 @@ class AINewsAnchorConfigView(HomeAssistantView):
         data = await request.json()
 
         try:
+            # Ensure enabled_categories is properly formatted
+            if "enabled_categories" not in data or not isinstance(data["enabled_categories"], dict):
+                # If not provided, use defaults
+                data["enabled_categories"] = entry.options.get(
+                    "enabled_categories",
+                    {
+                        "U.S.": True,
+                        "World": True,
+                        "Local": True,
+                        "Business": True,
+                        "Technology": True,
+                        "Entertainment": True,
+                        "Sports": True,
+                        "Science": True,
+                        "Health": True,
+                    },
+                )
+            
             # Update options
             hass.config_entries.async_update_entry(entry, options=data)
+            
+            # Trigger coordinator update
+            if entry.entry_id in hass.data[DOMAIN]:
+                coordinator = hass.data[DOMAIN][entry.entry_id]
+                coordinator._local_geo = data.get("local_geo", coordinator._local_geo)
+                coordinator._max_per_category = data.get("max_per_category", coordinator._max_per_category)
+                coordinator._enabled_categories = data.get("enabled_categories", coordinator._enabled_categories)
+            
             return self.json({"success": True})
         except Exception as err:
             _LOGGER.exception("Error updating config: %s", err)
