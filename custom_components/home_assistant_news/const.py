@@ -16,6 +16,7 @@ CATEGORY_MAP: Final[dict[str, str]] = {
 }
 
 GOOGLE_RSS_BASE: Final = "https://news.google.com/rss/headlines/section"
+GOOGLE_RSS_SEARCH_BASE: Final = "https://news.google.com/rss/search"
 
 DEFAULTS = {
     "scan_interval": 1800,
@@ -37,6 +38,7 @@ DEFAULTS = {
         "Science": True,
         "Health": True,
     },
+    "custom_sources": [],
 }
 
 

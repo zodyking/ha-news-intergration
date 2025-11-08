@@ -246,6 +246,54 @@
         }
       }
 
+      async refreshData() {
+        try {
+          this.loading = true;
+          this.error = null;
+
+          const response = await fetch('/api/home_assistant_news/refresh', {
+            method: 'POST',
+          });
+
+          if (response.ok) {
+            this.success = true;
+            setTimeout(() => {
+              this.success = false;
+              this.render();
+            }, 3000);
+          } else {
+            const error = await response.json();
+            this.error = error.error || 'Failed to refresh data';
+          }
+        } catch (err) {
+          this.error = `Error refreshing data: ${err.message}`;
+        } finally {
+          this.loading = false;
+          this.render();
+        }
+      }
+
+      addCustomSource() {
+        const custom_sources = this.config.custom_sources || [];
+        custom_sources.push({ name: '', query: '' });
+        this.config = { ...this.config, custom_sources };
+        this.render();
+      }
+
+      removeCustomSource(index) {
+        const custom_sources = [...(this.config.custom_sources || [])];
+        custom_sources.splice(index, 1);
+        this.config = { ...this.config, custom_sources };
+        this.render();
+      }
+
+      updateCustomSource(index, field, value) {
+        const custom_sources = [...(this.config.custom_sources || [])];
+        custom_sources[index] = { ...custom_sources[index], [field]: value };
+        this.config = { ...this.config, custom_sources };
+        this.render();
+      }
+
       updateConfig(key, value) {
         this.config = { ...this.config, [key]: value };
         this.render();
@@ -418,7 +466,63 @@
             </div>
           </div>
 
+          <div class="card">
+            <div class="card-header">Custom News Sources</div>
+            <div class="info-text" style="margin-bottom: 12px">
+              Add custom news sources using Google News search queries. The query will be used to search for news articles.
+            </div>
+            ${(this.config.custom_sources || []).map((source, index) => html`
+              <div class="form-group" style="border: 1px solid var(--sl-color-neutral-300); padding: 16px; border-radius: 6px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <label style="font-weight: 600;">Custom Source ${index + 1}</label>
+                  <sl-button
+                    variant="danger"
+                    size="small"
+                    @click=${() => this.removeCustomSource(index)}
+                  >
+                    <sl-icon slot="prefix" name="trash"></sl-icon>
+                    Remove
+                  </sl-button>
+                </div>
+                <div class="form-group">
+                  <label>Source Name</label>
+                  <sl-input
+                    .value=${source.name || ''}
+                    placeholder="e.g., Sports News"
+                    @sl-input=${(e) => this.updateCustomSource(index, 'name', e.target.value)}
+                  ></sl-input>
+                  <div class="info-text">Name for this news source (will be used as sensor name)</div>
+                </div>
+                <div class="form-group">
+                  <label>Search Query</label>
+                  <sl-input
+                    .value=${source.query || ''}
+                    placeholder="e.g., sports"
+                    @sl-input=${(e) => this.updateCustomSource(index, 'query', e.target.value)}
+                  ></sl-input>
+                  <div class="info-text">Google News search query (e.g., "sports", "technology", "politics")</div>
+                </div>
+              </div>
+            `)}
+            <sl-button
+              variant="default"
+              @click=${() => this.addCustomSource()}
+              style="width: 100%;"
+            >
+              <sl-icon slot="prefix" name="plus-circle"></sl-icon>
+              Add Custom Source
+            </sl-button>
+          </div>
+
           <div class="actions">
+            <sl-button
+              variant="default"
+              @click=${() => this.refreshData()}
+              .loading=${this.loading}
+            >
+              <sl-icon slot="prefix" name="arrow-clockwise"></sl-icon>
+              Refresh News Data
+            </sl-button>
             <sl-button
               variant="primary"
               @click=${() => this.playBriefing()}

@@ -12,7 +12,7 @@ from urllib.parse import quote
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CATEGORY_MAP, DEFAULTS, DOMAIN, GOOGLE_RSS_BASE
+from .const import CATEGORY_MAP, DEFAULTS, DOMAIN, GOOGLE_RSS_BASE, GOOGLE_RSS_SEARCH_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
         max_per_category: int,
         local_geo: str,
         enabled_categories: dict[str, bool],
+        custom_sources: list[dict[str, str]] | None = None,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -38,6 +39,7 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
         self._max_per_category = max_per_category
         self._local_geo = local_geo
         self._enabled_categories = enabled_categories
+        self._custom_sources = custom_sources or []
         self._session = None
 
     async def _async_update_data(
@@ -52,22 +54,26 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
 
         # Fetch all enabled categories in parallel
         tasks = []
+        category_list = []
         for category, enabled in self._enabled_categories.items():
             if not enabled:
                 results[category] = []
                 continue
 
+            category_list.append(category)
             if category == "Local":
                 tasks.append(self._fetch_local_feed(category))
             else:
                 tasks.append(self._fetch_topic_feed(category))
 
+        # Fetch custom sources in parallel
+        for source in self._custom_sources:
+            category_list.append(source.get("name", ""))
+            tasks.append(self._fetch_query_feed(source.get("name", ""), source.get("query", "")))
+
         fetched_data = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for category, data in zip(
-            [cat for cat, enabled in self._enabled_categories.items() if enabled],
-            fetched_data,
-        ):
+        for category, data in zip(category_list, fetched_data):
             if isinstance(data, Exception):
                 _LOGGER.warning(
                     "Error fetching %s: %s", category, data, exc_info=data
@@ -115,6 +121,26 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 return self._parse_rss(text)
         except Exception as err:
             _LOGGER.warning("Failed to fetch %s: %s", category, err)
+            return []
+
+    async def _fetch_query_feed(
+        self, name: str, query: str
+    ) -> list[dict[str, str]]:
+        """Fetch a query-based RSS feed."""
+        # URL encode the query
+        query_encoded = quote(query)
+        url = (
+            f"{GOOGLE_RSS_SEARCH_BASE}?q={query_encoded}"
+            "&hl=en-US&gl=US&ceid=US:en"
+        )
+
+        try:
+            async with self._session.get(url, timeout=10) as response:
+                response.raise_for_status()
+                text = await response.text()
+                return self._parse_rss(text)
+        except Exception as err:
+            _LOGGER.warning("Failed to fetch query feed %s (%s): %s", name, query, err)
             return []
 
     def _parse_rss(self, xml_text: str) -> list[dict[str, str]]:

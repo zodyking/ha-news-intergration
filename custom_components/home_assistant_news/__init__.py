@@ -34,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Views are defined at the bottom of this file
         hass.http.register_view(AINewsAnchorConfigView)
         hass.http.register_view(AINewsAnchorEntitiesView)
+        hass.http.register_view(AINewsAnchorRefreshView)
         hass.data[DOMAIN]["_views_registered"] = True
     
     coordinator = NewsCoordinator(
@@ -55,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "Health": True,
             },
         ),
+        custom_sources=entry.options.get("custom_sources", []),
     )
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -68,6 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Update coordinator when options change
     async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Handle options update."""
+        old_custom_sources = coordinator._custom_sources
         coordinator._max_per_category = entry.options.get("max_per_category", 2)
         coordinator._local_geo = entry.options.get("local_geo", "New York, NY")
         coordinator._enabled_categories = entry.options.get(
@@ -84,10 +87,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "Health": True,
             },
         )
+        coordinator._custom_sources = entry.options.get("custom_sources", [])
         coordinator.update_interval = timedelta(
             seconds=entry.options.get("scan_interval", 1800)
         )
-        await coordinator.async_request_refresh()
+        
+        # If custom sources changed, reload the entry to recreate sensors
+        if old_custom_sources != coordinator._custom_sources:
+            await hass.config_entries.async_reload(entry.entry_id)
+        else:
+            await coordinator.async_request_refresh()
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
@@ -316,6 +325,7 @@ class AINewsAnchorConfigView(HomeAssistantView):
                     "Health": True,
                 },
             ),
+            "custom_sources": entry.options.get("custom_sources", []),
         }
         return self.json(config)
 
@@ -357,6 +367,7 @@ class AINewsAnchorConfigView(HomeAssistantView):
                 coordinator._local_geo = data.get("local_geo", coordinator._local_geo)
                 coordinator._max_per_category = data.get("max_per_category", coordinator._max_per_category)
                 coordinator._enabled_categories = data.get("enabled_categories", coordinator._enabled_categories)
+                coordinator._custom_sources = data.get("custom_sources", [])
             
             return self.json({"success": True})
         except Exception as err:
@@ -393,4 +404,32 @@ class AINewsAnchorEntitiesView(HomeAssistantView):
                 "media_players": sorted(media_player_entities),
             }
         )
+
+
+class AINewsAnchorRefreshView(HomeAssistantView):
+    """View to manually refresh news data."""
+
+    url = "/api/home_assistant_news/refresh"
+    name = "api:home_assistant_news:refresh"
+    requires_auth = True
+
+    async def post(self, request: web.Request) -> web.Response:
+        """Trigger a manual refresh of news data."""
+        hass: HomeAssistant = request.app["hass"]
+        entries = hass.config_entries.async_entries(DOMAIN)
+        if not entries:
+            return self.json({"error": "No config entry found"}, status_code=404)
+
+        entry = entries[0]
+        
+        try:
+            if entry.entry_id in hass.data[DOMAIN]:
+                coordinator = hass.data[DOMAIN][entry.entry_id]
+                await coordinator.async_request_refresh()
+                return self.json({"success": True, "message": "Refresh triggered"})
+            else:
+                return self.json({"error": "Coordinator not found"}, status_code=404)
+        except Exception as err:
+            _LOGGER.exception("Error refreshing data: %s", err)
+            return self.json({"error": str(err)}, status_code=500)
 

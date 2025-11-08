@@ -46,6 +46,18 @@ async def async_setup_entry(
                 category=category,
             )
         )
+    
+    # Create sensors for custom sources
+    custom_sources = entry.options.get("custom_sources", [])
+    for source in custom_sources:
+        sensors.append(
+            NewsCategorySensor(
+                coordinator=coordinator,
+                entry=entry,
+                category=source.get("name", ""),
+                is_custom=True,
+            )
+        )
 
     async_add_entities(sensors)
 
@@ -60,12 +72,16 @@ class NewsCategorySensor(
         coordinator: NewsCoordinator,
         entry: ConfigEntry,
         category: str,
+        is_custom: bool = False,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._category = category
+        self._is_custom = is_custom
+        # Create entity ID friendly name
+        category_slug = category.lower().replace('.', '').replace(' ', '_').replace('-', '_')
         self._attr_name = f"Home Assistant News {category}"
-        self._attr_unique_id = f"{entry.entry_id}_{category.lower().replace('.', '').replace(' ', '_')}"
+        self._attr_unique_id = f"{entry.entry_id}_{category_slug}"
         self._attr_icon = "mdi:newspaper-variant-multiple"
         self._attr_entity_registry_enabled_default = True
 
@@ -82,22 +98,20 @@ class NewsCategorySensor(
         """Return additional state attributes."""
         if not self.coordinator.data:
             return {
-                "articles": [],
                 "article_count": 0,
             }
 
         articles = self.coordinator.data.get(self._category, [])
-        
-        return {
-            "articles": [
-                {
-                    "title": article.get("title", ""),
-                    "summary": article.get("summary", ""),
-                }
-                for article in articles
-            ],
+        attrs: dict[str, Any] = {
             "article_count": len(articles),
         }
+        
+        # Format as Story 1 Title, Story 1 Article, etc. (up to 3 stories)
+        for i, article in enumerate(articles[:3], start=1):
+            attrs[f"Story {i} Title"] = article.get("title", "")
+            attrs[f"Story {i} Article"] = article.get("summary", "")
+        
+        return attrs
 
     @property
     def available(self) -> bool:
