@@ -162,7 +162,7 @@
       async loadConfig() {
         try {
           this.loading = true;
-          const response = await fetch('/api/ai_news_anchor/config');
+          const response = await fetch('/api/home_assistant_news/config');
           if (response.ok) {
             this.config = await response.json();
           } else {
@@ -177,7 +177,7 @@
 
       async loadEntities() {
         try {
-          const response = await fetch('/api/ai_news_anchor/entities');
+          const response = await fetch('/api/home_assistant_news/entities');
           if (response.ok) {
             this.entities = await response.json();
           }
@@ -192,7 +192,7 @@
           this.error = null;
           this.success = false;
 
-          const response = await fetch('/api/ai_news_anchor/config', {
+          const response = await fetch('/api/home_assistant_news/config', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -224,9 +224,9 @@
           this.error = null;
 
           if (this.hass) {
-            await this.hass.callService('ai_news_anchor', 'play_briefing');
+            await this.hass.callService('home_assistant_news', 'play_briefing');
           } else {
-            await fetch('/api/services/ai_news_anchor/play_briefing', {
+            await fetch('/api/services/home_assistant_news/play_briefing', {
               method: 'POST',
             });
           }

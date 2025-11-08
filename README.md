@@ -14,7 +14,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 - 🎨 Intuitive panel UI built with Shoelace components
 - ⚙️ Fully configurable via Panel UI or Options Flow (no YAML editing required)
 - 🔄 Automatic news fetching with configurable intervals
-- 🎯 Exposes a service `ai_news_anchor.play_briefing` for automation
+- 🎯 Exposes a service `home_assistant_news.play_briefing` for automation
 
 ## Requirements
 
@@ -40,11 +40,11 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 ### Manual Installation
 
-1. Copy the `ai_news_anchor` folder to your `config/custom_components/` directory:
+1. Copy the `home_assistant_news` folder to your `config/custom_components/` directory:
    ```
    config/
    └── custom_components/
-       └── ai_news_anchor/
+       └── home_assistant_news/
            ├── __init__.py
            ├── manifest.json
            ├── const.py
@@ -58,7 +58,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
                └── en.json
    ```
 
-2. Copy the `www/ai_news_anchor/panel.html` file to your `config/www/ai_news_anchor/` directory
+2. Copy the `www/home_assistant_news/panel.html` file to your `config/www/home_assistant_news/` directory
 
 3. Restart Home Assistant
 
@@ -84,7 +84,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 The integration includes an intuitive panel interface built with Shoelace web components. Access it by:
 
 1. Clicking on "Home Assistant News" in the sidebar (if enabled)
-2. Or navigating to `/ai_news_anchor` in your browser
+2. Or navigating to `/home_assistant_news` in your browser
 
 The panel allows you to:
 - Configure all settings visually
@@ -98,13 +98,13 @@ The panel allows you to:
 Call the service directly:
 
 ```yaml
-service: ai_news_anchor.play_briefing
+service: home_assistant_news.play_briefing
 ```
 
 With optional overrides:
 
 ```yaml
-service: ai_news_anchor.play_briefing
+service: home_assistant_news.play_briefing
 data:
   override_max_per_category: 1
   override_media_players:
@@ -120,7 +120,7 @@ trigger:
   - platform: time
     at: "07:30:00"
 action:
-  - service: ai_news_anchor.play_briefing
+  - service: home_assistant_news.play_briefing
 mode: single
 ```
 
@@ -136,7 +136,7 @@ trigger:
   - platform: time
     at: "18:00:00"
 action:
-  - service: ai_news_anchor.play_briefing
+  - service: home_assistant_news.play_briefing
 mode: single
 ```
 

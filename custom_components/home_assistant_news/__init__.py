@@ -273,8 +273,8 @@ async def _play_briefing(
 class AINewsAnchorConfigView(HomeAssistantView):
     """View to handle config API requests."""
 
-    url = "/api/ai_news_anchor/config"
-    name = "api:ai_news_anchor:config"
+    url = "/api/home_assistant_news/config"
+    name = "api:home_assistant_news:config"
     requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
@@ -334,8 +334,8 @@ class AINewsAnchorConfigView(HomeAssistantView):
 class AINewsAnchorEntitiesView(HomeAssistantView):
     """View to get available entities."""
 
-    url = "/api/ai_news_anchor/entities"
-    name = "api:ai_news_anchor:entities"
+    url = "/api/home_assistant_news/entities"
+    name = "api:home_assistant_news:entities"
     requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:

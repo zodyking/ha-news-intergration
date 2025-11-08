@@ -26,8 +26,8 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 ### Manual Installation
 
-1. Copy the `ai_news_anchor` folder to your `config/custom_components/` directory
-2. Copy the `www/ai_news_anchor/panel.html` file to your `config/www/ai_news_anchor/` directory
+1. Copy the `home_assistant_news` folder to your `config/custom_components/` directory
+2. Copy the `www/home_assistant_news/panel.html` file to your `config/www/home_assistant_news/` directory
 3. Restart Home Assistant
 4. Go to Settings → Devices & Services → Add Integration
 5. Search for "Home Assistant News" and add it
@@ -45,7 +45,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 After installation, configure the integration via:
 
-1. **Panel UI** (Recommended): Navigate to `/ai_news_anchor` in your browser or click "Home Assistant News" in the sidebar
+1. **Panel UI** (Recommended): Navigate to `/home_assistant_news` in your browser or click "Home Assistant News" in the sidebar
 2. **Options Flow**: Go to Settings → Devices & Services → Home Assistant News → Configure
 
 ### Settings
@@ -64,7 +64,7 @@ After installation, configure the integration via:
 
 ### Panel UI
 
-Access the intuitive panel interface by clicking "Home Assistant News" in the sidebar or navigating to `/ai_news_anchor`. The panel allows you to:
+Access the intuitive panel interface by clicking "Home Assistant News" in the sidebar or navigating to `/home_assistant_news`. The panel allows you to:
 - Configure all settings visually
 - Test briefings with the "Play Briefing Now" button
 - See real-time status and error messages
@@ -73,7 +73,7 @@ Access the intuitive panel interface by clicking "Home Assistant News" in the si
 ### Service Call
 
 ```yaml
-service: ai_news_anchor.play_briefing
+service: home_assistant_news.play_briefing
 ```
 
 ### Automation Example
@@ -84,7 +84,7 @@ trigger:
   - platform: time
     at: "07:30:00"
 action:
-  - service: ai_news_anchor.play_briefing
+  - service: home_assistant_news.play_briefing
 mode: single
 ```
 

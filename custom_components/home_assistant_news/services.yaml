@@ -1,4 +1,4 @@
-ai_news_anchor:
+home_assistant_news:
   play_briefing:
     name: Play News Briefing
     description: Generate and play an AI-written news briefing on configured media players.

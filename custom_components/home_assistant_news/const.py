@@ -1,7 +1,7 @@
 """Constants for Home Assistant News integration."""
 from typing import Final
 
-DOMAIN: Final = "ai_news_anchor"
+DOMAIN: Final = "home_assistant_news"
 
 CATEGORY_MAP: Final[dict[str, str]] = {
     "U.S.": "NATION",
