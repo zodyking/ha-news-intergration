@@ -28,7 +28,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title="Home Assistant News", data={})
 
-        return self.async_show_form(step_id="user")
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({}),
+        )
 
     @staticmethod
     @callback

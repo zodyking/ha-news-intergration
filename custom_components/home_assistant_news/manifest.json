@@ -6,7 +6,6 @@
   "requirements": [],
   "after_dependencies": ["conversation", "tts"],
   "codeowners": ["@zodyking"],
-  "integration_type": "service",
   "iot_class": "cloud_polling",
   "panel": {
     "name": "Home Assistant News",
