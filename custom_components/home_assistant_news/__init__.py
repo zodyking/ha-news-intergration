@@ -24,16 +24,19 @@ PLATFORMS: list[str] = []
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Home Assistant News integration."""
     hass.data.setdefault(DOMAIN, {})
-
-    # Register API endpoints
-    hass.http.register_view(AINewsAnchorConfigView)
-    hass.http.register_view(AINewsAnchorEntitiesView)
-
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Assistant News from a config entry."""
+    # Register API endpoints (only once, views are defined later in this file)
+    if "_views_registered" not in hass.data[DOMAIN]:
+        # Import here to avoid circular dependency
+        # Views are defined at the bottom of this file
+        hass.http.register_view(AINewsAnchorConfigView)
+        hass.http.register_view(AINewsAnchorEntitiesView)
+        hass.data[DOMAIN]["_views_registered"] = True
+
     coordinator = NewsCoordinator(
         hass,
         scan_interval=entry.options.get("scan_interval", 1800),
