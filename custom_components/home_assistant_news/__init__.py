@@ -44,10 +44,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(AINewsAnchorConfigView)
         hass.http.register_view(AINewsAnchorRefreshView)
         
-        # Register view to serve panel HTML
+        # Register view to serve panel HTML - MUST be registered before entry setup
         hass.http.register_view(AINewsAnchorPanelView)
         
         hass.data[DOMAIN]["_views_registered"] = True
+        
+        # Log panel registration for debugging
+        _LOGGER.info("Home Assistant News panel registered at /local/home_assistant_news/panel.html")
     
     coordinator = NewsCoordinator(
         hass,
