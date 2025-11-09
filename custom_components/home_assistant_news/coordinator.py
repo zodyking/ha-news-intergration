@@ -214,21 +214,17 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                     description_text = re.sub(r'\s+', ' ', description_text).strip()
                     description = description_text
                     
-                    # Extract article link from description HTML (often contains actual article URL)
+                    # Extract article link from description HTML
+                    # All links are Google News redirects, but description may have a different/better redirect URL
                     # Look for <a href="..." in the description
                     href_match = re.search(r'<a[^>]*href=["\']([^"\']+)["\']', description_html, re.IGNORECASE)
                     if href_match:
                         extracted_link = html.unescape(href_match.group(1))
-                        # If the extracted link is not a Google News redirect, use it as the primary link
-                        # Otherwise, if the original link is a Google News redirect, prefer the extracted one
-                        if "news.google.com/rss/articles" not in extracted_link:
-                            # This is likely the actual article URL
+                        # Use the link from description if available (both are Google redirects anyway)
+                        # The description link might be more direct or newer
+                        if extracted_link:
                             link = extracted_link
-                            _LOGGER.debug("Extracted article URL from description: %s", link)
-                        elif "news.google.com/rss/articles" in link and extracted_link != link:
-                            # Both are Google News redirects, but description might have a different one
-                            # Keep the original link, but log for debugging
-                            _LOGGER.debug("Found Google News redirect in description: %s (using original: %s)", extracted_link, link)
+                            _LOGGER.debug("Using article URL from description: %s", link)
 
                 if title:
                     articles.append({"title": title, "link": link, "summary": "", "description": description})
