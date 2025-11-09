@@ -106,9 +106,9 @@ class NewsCategorySensor(
             "article_count": len(articles),
         }
         
-        # Format as Story 1 Title, Story 1 Article, etc. (up to 3 stories)
+        # Format as Story 1 Title, Story 1 Article, etc. (up to 10 stories)
         # Don't include title in article text - just the article content
-        for i, article in enumerate(articles[:3], start=1):
+        for i, article in enumerate(articles[:10], start=1):
             attrs[f"Story {i} Title"] = article.get("title", "")
             # Only include the article content, not the title
             article_content = article.get("summary", "").strip()

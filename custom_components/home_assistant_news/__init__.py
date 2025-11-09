@@ -253,13 +253,32 @@ class AINewsAnchorPanelView(HomeAssistantView):
             )
         
         try:
-            with open(panel_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            # Use async file reading
+            import aiofiles
+            async with aiofiles.open(panel_path, "r", encoding="utf-8") as f:
+                content = await f.read()
             return web.Response(
                 text=content,
                 content_type="text/html",
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
             )
+        except ImportError:
+            # Fallback to sync file reading if aiofiles not available
+            try:
+                with open(panel_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return web.Response(
+                    text=content,
+                    content_type="text/html",
+                    headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+                )
+            except Exception as err:
+                _LOGGER.exception("Error serving panel HTML: %s", err)
+                return web.Response(
+                    text=f"Error loading panel: {err}",
+                    status=500,
+                    content_type="text/plain",
+                )
         except Exception as err:
             _LOGGER.exception("Error serving panel HTML: %s", err)
             return web.Response(

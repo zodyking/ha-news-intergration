@@ -20,7 +20,7 @@ GOOGLE_RSS_SEARCH_BASE: Final = "https://news.google.com/rss/search"
 
 DEFAULTS = {
     "scan_interval": 1800,
-    "max_per_category": 2,
+    "max_per_category": 10,
     "local_geo": "New York, NY",
     "ai_mode": "auto",
     "conversation_agent_id": "",

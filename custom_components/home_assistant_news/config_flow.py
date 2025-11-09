@@ -88,7 +88,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     "max_per_category",
                     default=options.get("max_per_category", DEFAULTS["max_per_category"]),
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
                 vol.Required(
                     "scan_interval",
                     default=options.get("scan_interval", DEFAULTS["scan_interval"]),

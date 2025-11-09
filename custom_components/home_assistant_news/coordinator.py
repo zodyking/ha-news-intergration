@@ -200,60 +200,115 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
         return articles
 
     async def _scrape_article(self, url: str) -> str:
-        """Scrape full article content from URL."""
+        """Scrape full article content from URL using readability-lxml."""
         if not url:
             return ""
         
         try:
             # Follow redirects to get actual article URL
-            async with self._session.get(url, timeout=15, allow_redirects=True) as response:
+            async with self._session.get(
+                url, 
+                timeout=20, 
+                allow_redirects=True,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+            ) as response:
                 if response.status != 200:
+                    _LOGGER.warning("Failed to fetch article from %s: HTTP %d", url, response.status)
                     return ""
                 
-                text = await response.text()
+                html_content = await response.text()
                 
-                # Extract article content using basic HTML parsing
-                # Try to find main content areas
-                # Remove script and style tags
-                text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
-                
-                # Try to extract from common article tags
-                article_patterns = [
-                    r'<article[^>]*>(.*?)</article>',
-                    r'<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
-                    r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
-                    r'<main[^>]*>(.*?)</main>',
-                ]
-                
-                content = ""
-                for pattern in article_patterns:
-                    matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
-                    if matches:
-                        content = matches[0]
-                        break
-                
-                if not content:
-                    # Fallback: extract from body
-                    body_match = re.search(r'<body[^>]*>(.*?)</body>', text, re.DOTALL | re.IGNORECASE)
-                    if body_match:
-                        content = body_match.group(1)
-                
-                # Strip HTML tags
-                content = re.sub(r'<[^>]+>', ' ', content)
-                # Decode HTML entities
-                content = html.unescape(content)
-                # Collapse whitespace
-                content = re.sub(r'\s+', ' ', content)
-                content = content.strip()
-                
-                # Limit to reasonable length (2000 chars)
-                if len(content) > 2000:
-                    content = content[:2000] + "..."
-                
-                return content
+                # Use readability-lxml to extract article content
+                try:
+                    from readability import Document
+                    from lxml import html as lxml_html
+                    
+                    # Parse HTML with lxml
+                    doc = lxml_html.fromstring(html_content.encode('utf-8'))
+                    
+                    # Use readability to extract article content
+                    readable_article = Document(doc)
+                    article_html = readable_article.summary()
+                    
+                    # Parse the extracted HTML to get text
+                    article_doc = lxml_html.fromstring(article_html.encode('utf-8'))
+                    article_text = article_doc.text_content()
+                    
+                    # Clean up the text
+                    # Decode HTML entities
+                    article_text = html.unescape(article_text)
+                    # Collapse whitespace
+                    article_text = re.sub(r'\s+', ' ', article_text)
+                    article_text = article_text.strip()
+                    
+                    # Limit to reasonable length (5000 chars for full articles)
+                    if len(article_text) > 5000:
+                        article_text = article_text[:5000] + "..."
+                    
+                    if article_text:
+                        _LOGGER.debug("Successfully scraped article from %s (%d chars)", url, len(article_text))
+                        return article_text
+                    else:
+                        _LOGGER.warning("Readability extracted empty content from %s", url)
+                        return ""
+                        
+                except ImportError:
+                    _LOGGER.warning("readability-lxml not available, falling back to basic extraction")
+                    # Fallback to basic extraction if readability is not available
+                    return self._basic_extract_article(html_content)
+                except Exception as err:
+                    _LOGGER.warning("Readability extraction failed for %s: %s, trying fallback", url, err)
+                    # Fallback to basic extraction
+                    return self._basic_extract_article(html_content)
                 
         except Exception as err:
             _LOGGER.warning("Failed to scrape article from %s: %s", url, err)
+            return ""
+    
+    def _basic_extract_article(self, html_content: str) -> str:
+        """Basic fallback article extraction."""
+        try:
+            # Remove script and style tags
+            html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            
+            # Try to extract from common article tags
+            article_patterns = [
+                r'<article[^>]*>(.*?)</article>',
+                r'<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+                r'<main[^>]*>(.*?)</main>',
+            ]
+            
+            content = ""
+            for pattern in article_patterns:
+                matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
+                if matches:
+                    content = matches[0]
+                    break
+            
+            if not content:
+                # Fallback: extract from body
+                body_match = re.search(r'<body[^>]*>(.*?)</body>', html_content, re.DOTALL | re.IGNORECASE)
+                if body_match:
+                    content = body_match.group(1)
+            
+            # Strip HTML tags
+            content = re.sub(r'<[^>]+>', ' ', content)
+            # Decode HTML entities
+            content = html.unescape(content)
+            # Collapse whitespace
+            content = re.sub(r'\s+', ' ', content)
+            content = content.strip()
+            
+            # Limit to reasonable length (5000 chars)
+            if len(content) > 5000:
+                content = content[:5000] + "..."
+            
+            return content
+        except Exception as err:
+            _LOGGER.warning("Basic extraction failed: %s", err)
             return ""
 
