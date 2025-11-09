@@ -92,54 +92,36 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                             break
                 results[category] = unique_articles
 
-        # Update articles with content - use description as primary source, scrape only if needed
+        # Scrape article content for all articles in parallel
         scrape_tasks = []
         article_list = []
         for category, articles in results.items():
             for article in articles:
                 article_list.append((category, article))
-                description = article.get("description", "")
-                
-                # If description is substantial (>= 100 chars), use it directly
-                if description and len(description) >= 100:
-                    article["summary"] = description
-                    _LOGGER.debug("Using RSS description (%d chars) for article", len(description))
-                    scrape_tasks.append(None)  # No scraping needed
-                else:
-                    # Description is missing or too short, try to scrape
-                    scrape_tasks.append(self._scrape_article(article.get("link", "")))
+                # Always try to scrape - this is the primary method
+                scrape_tasks.append(self._scrape_article(article.get("link", "")))
         
-        # Scrape articles that need it in parallel
-        if any(task is not None for task in scrape_tasks):
-            async def noop():
-                return ""
+        # Scrape all articles in parallel
+        scraped_results = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+        
+        # Update articles with scraped content
+        for (category, article), scraped in zip(article_list, scraped_results):
+            description = article.get("description", "")
             
-            scraped_results = await asyncio.gather(
-                *[task if task else noop() for task in scrape_tasks],
-                return_exceptions=True
-            )
-            
-            # Update articles with scraped content
-            for (category, article), scraped in zip(article_list, scraped_results):
-                description = article.get("description", "")
-                
-                # If we already set summary from description, skip
-                if article.get("summary"):
-                    continue
-                
-                if isinstance(scraped, Exception):
-                    _LOGGER.debug("Error scraping article: %s, using description", scraped)
-                    article["summary"] = description if description else ""
-                elif scraped and len(scraped) > 50:
-                    article["summary"] = scraped
-                    _LOGGER.debug("Using scraped content (%d chars) for article", len(scraped))
+            if isinstance(scraped, Exception):
+                _LOGGER.warning("Error scraping article: %s, using description as fallback", scraped)
+                article["summary"] = description if description else ""
+            elif scraped and len(scraped) > 100:
+                # Use scraped content if it's substantial
+                article["summary"] = scraped
+                _LOGGER.debug("Using scraped content (%d chars) for article", len(scraped))
+            else:
+                # Scraping failed or returned insufficient content, use description if available
+                article["summary"] = description if description else ""
+                if description:
+                    _LOGGER.warning("Scraping failed or returned insufficient content (%d chars), using RSS description (%d chars) as fallback", len(scraped) if scraped else 0, len(description))
                 else:
-                    # Scraping failed or returned insufficient content, use description if available
-                    article["summary"] = description if description else ""
-                    if description:
-                        _LOGGER.debug("Scraping failed, using RSS description (%d chars)", len(description))
-                    else:
-                        _LOGGER.debug("No description or scraped content available for article")
+                    _LOGGER.warning("No description or scraped content available for article")
 
         return results
 
@@ -248,51 +230,74 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
             # For Google News redirect URLs, we need to extract the actual article URL
             actual_url = url
             if "news.google.com/rss/articles" in url:
-                # This is a Google News redirect URL, try to get the actual URL
+                # This is a Google News redirect URL, follow it to get the actual URL
                 try:
+                    # First, try to follow redirects automatically
                     async with self._session.get(
                         url,
-                        timeout=10,
-                        allow_redirects=False,
+                        timeout=15,
+                        allow_redirects=True,
+                        max_redirects=10,
                         headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                            "Accept-Language": "en-US,en;q=0.5",
+                            "Referer": "https://news.google.com/",
                         }
                     ) as redirect_response:
-                        # Check for redirect location header
-                        if redirect_response.status in (301, 302, 303, 307, 308):
-                            location = redirect_response.headers.get("Location", "")
-                            if location:
-                                actual_url = location
-                                _LOGGER.debug("Extracted actual URL from redirect header: %s", actual_url)
-                        elif redirect_response.status == 200:
-                            # Try to extract URL from HTML (Google News sometimes uses meta refresh or JS redirects)
-                            redirect_html = await redirect_response.text()
-                            # Look for meta refresh
-                            meta_refresh = re.search(r'<meta[^>]*http-equiv=["\']?refresh["\']?[^>]*content=["\']?[^"\']*url=([^"\']+)["\']?', redirect_html, re.IGNORECASE)
-                            if meta_refresh:
-                                actual_url = meta_refresh.group(1)
-                                _LOGGER.debug("Extracted actual URL from meta refresh: %s", actual_url)
+                        if redirect_response.status == 200:
+                            # Get the final URL after redirects
+                            final_url = str(redirect_response.url)
+                            if final_url != url and "news.google.com" not in final_url:
+                                actual_url = final_url
+                                _LOGGER.debug("Extracted actual URL from redirect: %s", actual_url)
                             else:
-                                # Look for JavaScript redirect
-                                js_redirect = re.search(r'window\.location\.href\s*=\s*["\']([^"\']+)["\']', redirect_html, re.IGNORECASE)
-                                if js_redirect:
-                                    actual_url = js_redirect.group(1)
-                                    _LOGGER.debug("Extracted actual URL from JavaScript redirect: %s", actual_url)
+                                # Still on Google News, try to extract from HTML
+                                redirect_html = await redirect_response.text()
+                                
+                                # Try multiple methods to extract the actual URL
+                                # Method 1: Look for meta refresh
+                                meta_refresh = re.search(r'<meta[^>]*http-equiv=["\']?refresh["\']?[^>]*content=["\']?[^"\']*url=([^"\']+)["\']?', redirect_html, re.IGNORECASE)
+                                if meta_refresh:
+                                    actual_url = meta_refresh.group(1)
+                                    _LOGGER.debug("Extracted actual URL from meta refresh: %s", actual_url)
+                                else:
+                                    # Method 2: Look for JavaScript redirect
+                                    js_redirect = re.search(r'window\.location\.href\s*=\s*["\']([^"\']+)["\']', redirect_html, re.IGNORECASE)
+                                    if js_redirect:
+                                        actual_url = js_redirect.group(1)
+                                        _LOGGER.debug("Extracted actual URL from JavaScript redirect: %s", actual_url)
+                                    else:
+                                        # Method 3: Look for article link in the page
+                                        article_link = re.search(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>.*?Read more', redirect_html, re.IGNORECASE | re.DOTALL)
+                                        if article_link:
+                                            actual_url = article_link.group(1)
+                                            _LOGGER.debug("Extracted actual URL from article link: %s", actual_url)
+                                        else:
+                                            # Method 4: Look for any external link (not Google News)
+                                            external_links = re.findall(r'<a[^>]*href=["\'](https?://[^"\']+)["\']', redirect_html, re.IGNORECASE)
+                                            for link in external_links:
+                                                if "news.google.com" not in link and "google.com" not in link:
+                                                    actual_url = link
+                                                    _LOGGER.debug("Extracted actual URL from external link: %s", actual_url)
+                                                    break
                 except Exception as redirect_err:
                     _LOGGER.debug("Could not extract URL from redirect: %s", redirect_err)
             
-            # Follow redirects to get actual article URL
+            # Fetch the actual article URL
             async with self._session.get(
                 actual_url, 
-                timeout=20, 
+                timeout=25, 
                 allow_redirects=True,
+                max_redirects=10,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                     "Accept-Language": "en-US,en;q=0.5",
                     "Accept-Encoding": "gzip, deflate, br",
                     "Connection": "keep-alive",
-                    "Upgrade-Insecure-Requests": "1"
+                    "Upgrade-Insecure-Requests": "1",
+                    "Referer": "https://news.google.com/",
                 }
             ) as response:
                 if response.status != 200:
@@ -387,7 +392,7 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                         break
             
             if not content or len(content) < 200:
-                # Try to extract paragraphs directly
+                # Try to extract paragraphs directly - this is often the most reliable
                 para_matches = re.findall(r'<p[^>]*>(.*?)</p>', html_content, re.DOTALL | re.IGNORECASE)
                 if para_matches:
                     # Combine all paragraphs
@@ -397,24 +402,30 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                         para_clean = re.sub(r'<[^>]+>', ' ', para)
                         para_clean = html.unescape(para_clean)
                         para_clean = re.sub(r'\s+', ' ', para_clean).strip()
-                        if len(para_clean) > 50:  # Only include substantial paragraphs
+                        # Only include substantial paragraphs (at least 30 chars to avoid navigation/ads)
+                        if len(para_clean) > 30:
                             para_texts.append(para_clean)
                     if para_texts:
-                        content = ' '.join(para_texts)
-                        _LOGGER.debug("Extracted content from paragraphs (%d chars)", len(content))
+                        # Join paragraphs and filter out very short ones
+                        combined = ' '.join(para_texts)
+                        if len(combined) > 200:
+                            content = combined
+                            _LOGGER.debug("Extracted content from paragraphs (%d chars)", len(content))
             
             if not content or len(content) < 200:
                 # Fallback: extract from body, but exclude common non-content elements
                 body_match = re.search(r'<body[^>]*>(.*?)</body>', html_content, re.DOTALL | re.IGNORECASE)
                 if body_match:
                     body_content = body_match.group(1)
-                    # Remove navigation, header, footer, sidebar, ads
+                    # Remove navigation, header, footer, sidebar, ads, scripts, forms
                     body_content = re.sub(r'<nav[^>]*>.*?</nav>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     body_content = re.sub(r'<header[^>]*>.*?</header>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     body_content = re.sub(r'<footer[^>]*>.*?</footer>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     body_content = re.sub(r'<aside[^>]*>.*?</aside>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     body_content = re.sub(r'<div[^>]*class="[^"]*ad[^"]*"[^>]*>.*?</div>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     body_content = re.sub(r'<div[^>]*id="[^"]*ad[^"]*"[^>]*>.*?</div>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    body_content = re.sub(r'<form[^>]*>.*?</form>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    body_content = re.sub(r'<button[^>]*>.*?</button>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
                     # Extract text from remaining body
                     body_content = re.sub(r'<[^>]+>', ' ', body_content)
                     body_content = html.unescape(body_content)
