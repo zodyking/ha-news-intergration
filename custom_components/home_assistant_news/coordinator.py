@@ -51,6 +51,7 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
             self._session = aiohttp_client.async_get_clientsession(self.hass)
 
         results: dict[str, list[dict[str, str]]] = {}
+        used_article_ids: set[str] = set()  # Track articles to prevent duplicates
 
         # Fetch all enabled categories in parallel
         tasks = []
@@ -80,7 +81,34 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 )
                 results[category] = []
             else:
-                results[category] = data[: self._max_per_category]
+                # Filter out duplicates and limit to max_per_category
+                unique_articles = []
+                for article in data:
+                    article_id = article.get("link", article.get("title", ""))
+                    if article_id and article_id not in used_article_ids:
+                        used_article_ids.add(article_id)
+                        unique_articles.append(article)
+                        if len(unique_articles) >= self._max_per_category:
+                            break
+                results[category] = unique_articles
+
+        # Scrape article content for all articles in parallel
+        scrape_tasks = []
+        article_list = []
+        for category, articles in results.items():
+            for article in articles:
+                article_list.append((category, article))
+                scrape_tasks.append(self._scrape_article(article.get("link", "")))
+        
+        scraped_contents = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+        
+        # Update articles with scraped content
+        for (category, article), content in zip(article_list, scraped_contents):
+            if isinstance(content, Exception):
+                _LOGGER.warning("Error scraping article: %s", content)
+                article["summary"] = ""
+            else:
+                article["summary"] = content if content else ""
 
         return results
 
@@ -151,24 +179,18 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
             # Find all items
             for item in root.findall(".//item"):
                 title_elem = item.find("title")
-                desc_elem = item.find("description")
+                link_elem = item.find("link")
 
                 title = ""
                 if title_elem is not None and title_elem.text:
                     title = html.unescape(title_elem.text.strip())
 
-                summary = ""
-                if desc_elem is not None and desc_elem.text:
-                    # Remove HTML tags and clean up
-                    text = html.unescape(desc_elem.text)
-                    # Strip HTML tags using regex
-                    text = re.sub(r"<[^>]+>", "", text)
-                    # Collapse whitespace
-                    text = re.sub(r"\s+", " ", text)
-                    summary = text.strip()[:600]  # Limit to 600 chars
+                link = ""
+                if link_elem is not None and link_elem.text:
+                    link = html.unescape(link_elem.text.strip())
 
                 if title:
-                    articles.append({"title": title, "summary": summary})
+                    articles.append({"title": title, "link": link, "summary": ""})
 
         except ET.ParseError as err:
             _LOGGER.warning("Failed to parse RSS XML: %s", err)
@@ -176,4 +198,64 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
             _LOGGER.warning("Unexpected error parsing RSS: %s", err)
 
         return articles
+
+    async def _scrape_article(self, url: str) -> str:
+        """Scrape full article content from URL."""
+        if not url:
+            return ""
+        
+        try:
+            # Follow redirects to get actual article URL
+            async with self._session.get(url, timeout=15, allow_redirects=True) as response:
+                if response.status != 200:
+                    return ""
+                
+                text = await response.text()
+                
+                # Extract article content using basic HTML parsing
+                # Try to find main content areas
+                import re
+                
+                # Remove script and style tags
+                text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+                
+                # Try to extract from common article tags
+                article_patterns = [
+                    r'<article[^>]*>(.*?)</article>',
+                    r'<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
+                    r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+                    r'<main[^>]*>(.*?)</main>',
+                ]
+                
+                content = ""
+                for pattern in article_patterns:
+                    matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+                    if matches:
+                        content = matches[0]
+                        break
+                
+                if not content:
+                    # Fallback: extract from body
+                    body_match = re.search(r'<body[^>]*>(.*?)</body>', text, re.DOTALL | re.IGNORECASE)
+                    if body_match:
+                        content = body_match.group(1)
+                
+                # Strip HTML tags
+                content = re.sub(r'<[^>]+>', ' ', content)
+                # Decode HTML entities
+                content = html.unescape(content)
+                # Collapse whitespace
+                content = re.sub(r'\s+', ' ', content)
+                content = content.strip()
+                
+                # Limit to reasonable length (2000 chars)
+                if len(content) > 2000:
+                    content = content[:2000] + "..."
+                
+                return content
+                
+        except Exception as err:
+            _LOGGER.warning("Failed to scrape article from %s: %s", url, err)
+            return ""
 

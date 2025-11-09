@@ -5,6 +5,7 @@ import asyncio
 import logging
 from datetime import timedelta
 
+import os
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.config_entries import ConfigEntry
@@ -27,11 +28,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Home Assistant News from a config entry."""
-    # Register API endpoints (only once)
+    # Register API endpoints and static path (only once)
     if "_views_registered" not in hass.data[DOMAIN]:
         # Views are defined at the bottom of this file
         hass.http.register_view(AINewsAnchorConfigView)
         hass.http.register_view(AINewsAnchorRefreshView)
+        
+        # Register static path for panel HTML
+        panel_path = os.path.join(
+            os.path.dirname(__file__), "www", "home_assistant_news", "panel.html"
+        )
+        if os.path.exists(panel_path):
+            hass.http.register_static_path(
+                "/local/home_assistant_news/panel.html",
+                panel_path,
+                cache_headers=False,
+            )
+        
         hass.data[DOMAIN]["_views_registered"] = True
     
     coordinator = NewsCoordinator(
