@@ -231,3 +231,40 @@ class AINewsAnchorRefreshView(HomeAssistantView):
             _LOGGER.exception("Error refreshing data: %s", err)
             return self.json({"error": str(err)}, status_code=500)
 
+
+class AINewsAnchorPanelView(HomeAssistantView):
+    """View to serve the panel HTML."""
+
+    url = "/local/home_assistant_news/panel.html"
+    name = "home_assistant_news:panel"
+    requires_auth = False
+
+    async def get(self, request: web.Request) -> web.Response:
+        """Serve the panel HTML file."""
+        panel_path = os.path.join(
+            os.path.dirname(__file__), "www", "home_assistant_news", "panel.html"
+        )
+        
+        if not os.path.exists(panel_path):
+            return web.Response(
+                text="Panel HTML file not found",
+                status=404,
+                content_type="text/plain",
+            )
+        
+        try:
+            with open(panel_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return web.Response(
+                text=content,
+                content_type="text/html",
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            )
+        except Exception as err:
+            _LOGGER.exception("Error serving panel HTML: %s", err)
+            return web.Response(
+                text=f"Error loading panel: {err}",
+                status=500,
+                content_type="text/plain",
+            )
+
