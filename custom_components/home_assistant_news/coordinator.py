@@ -205,11 +205,30 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
 
                 # Extract description as fallback
                 description = ""
+                description_html = ""
                 if desc_elem is not None and desc_elem.text:
-                    description = html.unescape(desc_elem.text.strip())
-                    # Clean HTML from description
-                    description = re.sub(r'<[^>]+>', ' ', description)
-                    description = re.sub(r'\s+', ' ', description).strip()
+                    description_html = desc_elem.text.strip()
+                    description = html.unescape(description_html)
+                    # Clean HTML from description for text-only version
+                    description_text = re.sub(r'<[^>]+>', ' ', description)
+                    description_text = re.sub(r'\s+', ' ', description_text).strip()
+                    description = description_text
+                    
+                    # Extract article link from description HTML (often contains actual article URL)
+                    # Look for <a href="..." in the description
+                    href_match = re.search(r'<a[^>]*href=["\']([^"\']+)["\']', description_html, re.IGNORECASE)
+                    if href_match:
+                        extracted_link = html.unescape(href_match.group(1))
+                        # If the extracted link is not a Google News redirect, use it as the primary link
+                        # Otherwise, if the original link is a Google News redirect, prefer the extracted one
+                        if "news.google.com/rss/articles" not in extracted_link:
+                            # This is likely the actual article URL
+                            link = extracted_link
+                            _LOGGER.debug("Extracted article URL from description: %s", link)
+                        elif "news.google.com/rss/articles" in link and extracted_link != link:
+                            # Both are Google News redirects, but description might have a different one
+                            # Keep the original link, but log for debugging
+                            _LOGGER.debug("Found Google News redirect in description: %s (using original: %s)", extracted_link, link)
 
                 if title:
                     articles.append({"title": title, "link": link, "summary": "", "description": description})
