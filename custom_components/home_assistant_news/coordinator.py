@@ -92,25 +92,54 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                             break
                 results[category] = unique_articles
 
-        # Scrape article content for all articles in parallel
+        # Update articles with content - use description as primary source, scrape only if needed
         scrape_tasks = []
         article_list = []
         for category, articles in results.items():
             for article in articles:
                 article_list.append((category, article))
-                scrape_tasks.append(self._scrape_article(article.get("link", "")))
+                description = article.get("description", "")
+                
+                # If description is substantial (>= 100 chars), use it directly
+                if description and len(description) >= 100:
+                    article["summary"] = description
+                    _LOGGER.debug("Using RSS description (%d chars) for article", len(description))
+                    scrape_tasks.append(None)  # No scraping needed
+                else:
+                    # Description is missing or too short, try to scrape
+                    scrape_tasks.append(self._scrape_article(article.get("link", "")))
         
-        scraped_contents = await asyncio.gather(*scrape_tasks, return_exceptions=True)
-        
-        # Update articles with scraped content
-        for (category, article), content in zip(article_list, scraped_contents):
-            if isinstance(content, Exception):
-                _LOGGER.warning("Error scraping article: %s", content)
-                # Use description as fallback if scraping failed
-                article["summary"] = article.get("description", "")
-            else:
-                # Use scraped content if available, otherwise fall back to description
-                article["summary"] = content if content else article.get("description", "")
+        # Scrape articles that need it in parallel
+        if any(task is not None for task in scrape_tasks):
+            async def noop():
+                return ""
+            
+            scraped_results = await asyncio.gather(
+                *[task if task else noop() for task in scrape_tasks],
+                return_exceptions=True
+            )
+            
+            # Update articles with scraped content
+            for (category, article), scraped in zip(article_list, scraped_results):
+                description = article.get("description", "")
+                
+                # If we already set summary from description, skip
+                if article.get("summary"):
+                    continue
+                
+                if isinstance(scraped, Exception):
+                    _LOGGER.debug("Error scraping article: %s, using description", scraped)
+                    article["summary"] = description if description else ""
+                elif scraped and len(scraped) > 50:
+                    article["summary"] = scraped
+                    _LOGGER.debug("Using scraped content (%d chars) for article", len(scraped))
+                else:
+                    # Scraping failed or returned insufficient content, use description if available
+                    article["summary"] = description if description else ""
+                    if description:
+                        _LOGGER.debug("Scraping failed, using RSS description (%d chars)", len(description))
+                    else:
+                        _LOGGER.debug("No description or scraped content available for article")
 
         return results
 
