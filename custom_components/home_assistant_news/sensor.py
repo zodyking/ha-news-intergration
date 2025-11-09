@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -109,13 +110,33 @@ class NewsCategorySensor(
         # Format as Story 1 Title, Story 1 Article, etc. (up to 10 stories)
         # Don't include title in article text - just the article content
         for i, article in enumerate(articles[:10], start=1):
-            attrs[f"Story {i} Title"] = article.get("title", "")
+            title = article.get("title", "")
+            # Remove source attribution from title if not already done
+            title = re.sub(r'\s*[-|–—]\s*[^-|–—]+$', '', title).strip()
+            attrs[f"Story {i} Title"] = title
+            
             # Only include the article content, not the title
             article_content = article.get("summary", "").strip()
-            # Remove title if it appears at the start of the content
-            title = article.get("title", "")
-            if title and article_content.startswith(title):
-                article_content = article_content[len(title):].strip()
+            
+            # Remove title if it appears at the start of the content (case-insensitive)
+            if title:
+                title_lower = title.lower()
+                content_lower = article_content.lower()
+                if content_lower.startswith(title_lower):
+                    # Remove title and any following punctuation/whitespace
+                    article_content = article_content[len(title):].strip()
+                    # Remove leading punctuation like dashes, colons, etc.
+                    article_content = re.sub(r'^[-:;|–—\s]+', '', article_content).strip()
+            
+            # Remove source attributions from article content (common patterns)
+            # Remove patterns like "Source Name", "source.com", " - Source Name", etc.
+            article_content = re.sub(r'\s*[-|–—]\s*[A-Z][a-zA-Z\s]+(?:News|Journal|Times|Post|Tribune|Herald|Gazette|Chronicle|Observer|Guardian|Independent|Express|Mirror|Sun|Star|Mail|Telegraph|Standard|Review|Magazine|Weekly|Daily|Monthly|Today|Now|Here|There|This|That)\s*$', '', article_content, flags=re.IGNORECASE)
+            article_content = re.sub(r'\s+[A-Z][a-zA-Z\s]+(?:\.com|\.org|\.net|\.io|\.co\.uk)\s*$', '', article_content, flags=re.IGNORECASE)
+            
+            # Remove repeated source names that appear in the content
+            # Common pattern: "Title Source Name Source Name Source Name..."
+            article_content = re.sub(r'\s+([A-Z][a-zA-Z\s]+(?:News|Journal|Times|Post|Tribune|Herald|Gazette|Chronicle|Observer|Guardian|Independent|Express|Mirror|Sun|Star|Mail|Telegraph|Standard|Review|Magazine|Weekly|Daily|Monthly|Today|Now|Here|There|This|That))\s+(\1\s*)+', r' \1', article_content, flags=re.IGNORECASE)
+            
             attrs[f"Story {i} Article"] = article_content
         
         return attrs

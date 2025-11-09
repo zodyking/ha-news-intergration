@@ -41,6 +41,9 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
         self._enabled_categories = enabled_categories
         self._custom_sources = custom_sources or []
         self._session = None
+        # Initialize session lazily
+        from homeassistant.helpers import aiohttp_client
+        self._aiohttp_client = aiohttp_client
 
     async def _async_update_data(
         self,
@@ -198,6 +201,9 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 title = ""
                 if title_elem is not None and title_elem.text:
                     title = html.unescape(title_elem.text.strip())
+                    # Remove source attribution from title (e.g., " - The Wall Street Journal")
+                    # Common patterns: " - Source Name", " | Source Name", " – Source Name" (en dash)
+                    title = re.sub(r'\s*[-|–—]\s*[^-|–—]+$', '', title).strip()
 
                 link = ""
                 if link_elem is not None and link_elem.text:
@@ -240,6 +246,10 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
         """Scrape full article content from URL using readability-lxml."""
         if not url:
             return ""
+        
+        # Initialize session if needed
+        if self._session is None:
+            self._session = self._aiohttp_client.async_get_clientsession(self.hass)
         
         try:
             # For Google News redirect URLs, we need to extract the actual article URL
