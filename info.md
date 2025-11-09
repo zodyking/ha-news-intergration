@@ -5,11 +5,11 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 ## Features
 
 - 📰 Fetches headlines from Google News RSS feeds for 9 categories
-- 🤖 Uses Home Assistant's AI services to generate broadcast-style scripts
-- 🔊 Plays briefings on media players using TTS
+- 📊 Creates sensor entities for each news category with article data
 - 🎨 Intuitive panel UI built with Shoelace components
 - ⚙️ Fully configurable via panel or options flow
 - 🔄 Automatic news fetching with configurable intervals
+- 🔍 Supports custom query-based news sources
 
 ## Installation
 
@@ -35,9 +35,7 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 ## Requirements
 
 - Home Assistant 2023.1 or later
-- A TTS integration configured (e.g., Google Cloud TTS, Amazon Polly, etc.)
-- At least one media player entity
-- One of the following AI services:
+- One of the following AI services (optional, for future features):
   - Google Generative AI Conversation integration, OR
   - A configured Conversation agent
 
@@ -51,14 +49,12 @@ After installation, configure the integration via:
 ### Settings
 
 - **Local Geographic Area**: Your location for local news (e.g., "New York, NY")
-- **Max Articles Per Category**: 1-3 articles per category
+- **Max Articles Per Category**: 1-10 articles per category
 - **Scan Interval**: How often to fetch news (600-7200 seconds, default 1800)
-- **TTS Entity**: Select your TTS entity
-- **Media Players**: Select one or more media players
 - **AI Mode**: Choose "auto", "google_generative_ai_conversation", or "conversation"
 - **Conversation Agent ID**: Required if AI mode is "conversation"
-- **Pre-roll Delay**: Delay in milliseconds before speaking (0-300)
 - **Enabled Categories**: Toggle which categories to include
+- **Custom News Sources**: Add custom query-based news sources
 
 ## Usage
 
@@ -66,27 +62,10 @@ After installation, configure the integration via:
 
 Access the intuitive panel interface by clicking "Home Assistant News" in the sidebar or navigating to `/home_assistant_news`. The panel allows you to:
 - Configure all settings visually
-- Test briefings with the "Play Briefing Now" button
+- Manually refresh news data with the "Refresh News Data" button
 - See real-time status and error messages
 - Toggle news categories on/off
-
-### Service Call
-
-```yaml
-service: home_assistant_news.play_briefing
-```
-
-### Automation Example
-
-```yaml
-alias: Morning News Briefing
-trigger:
-  - platform: time
-    at: "07:30:00"
-action:
-  - service: home_assistant_news.play_briefing
-mode: single
-```
+- Add and manage custom news sources
 
 ## News Categories
 

@@ -3,7 +3,7 @@
   "name": "Home Assistant News",
   "version": "0.1.0",
   "documentation": "https://github.com/zodyking/ai_news_anchor",
-  "requirements": ["readability-lxml==0.8.1", "lxml==5.1.0", "aiofiles==23.2.1"],
+  "requirements": ["readability-lxml==0.8.1", "lxml>=5.1.0", "aiofiles>=24.1.0"],
   "after_dependencies": ["conversation"],
   "codeowners": ["@zodyking"],
   "config_flow": true,

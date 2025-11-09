@@ -237,7 +237,7 @@ class AINewsAnchorPanelView(HomeAssistantView):
 
     url = "/local/home_assistant_news/panel.html"
     name = "home_assistant_news:panel"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         """Serve the panel HTML file."""

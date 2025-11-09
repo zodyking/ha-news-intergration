@@ -9,19 +9,16 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 ## Features
 
 - 📰 Fetches headlines from Google News RSS feeds for 9 categories: U.S., World, Local, Business, Technology, Entertainment, Sports, Science, and Health
-- 🤖 Uses Home Assistant's AI services (Google Generative AI or Conversation agents) to generate broadcast-style scripts
-- 🔊 Plays briefings on one or more media players using TTS
+- 📊 Creates sensor entities for each news category with article data
 - 🎨 Intuitive panel UI built with Shoelace components
 - ⚙️ Fully configurable via Panel UI or Options Flow (no YAML editing required)
 - 🔄 Automatic news fetching with configurable intervals
-- 🎯 Exposes a service `home_assistant_news.play_briefing` for automation
+- 🔍 Supports custom query-based news sources
 
 ## Requirements
 
 - Home Assistant 2023.1 or later
-- A TTS integration configured (e.g., Google Cloud TTS, Amazon Polly, etc.)
-- At least one media player entity
-- One of the following AI services:
+- One of the following AI services (optional, for future features):
   - Google Generative AI Conversation integration, OR
   - A configured Conversation agent
 
@@ -52,7 +49,6 @@ A Home Assistant custom integration that generates and plays AI-written news bri
            ├── coordinator.py
            ├── summarizer.py
            ├── diagnostics.py
-           ├── services.yaml
            ├── strings.json
            ├── www/
            │   └── home_assistant_news/
@@ -77,14 +73,12 @@ A Home Assistant custom integration that generates and plays AI-written news bri
 
 6. Configure the integration via **Panel UI** or **Options**:
    - **Local Geographic Area**: Your location for local news (e.g., "New York, NY")
-   - **Max Articles Per Category**: 1-3 articles per category
+   - **Max Articles Per Category**: 1-10 articles per category
    - **Scan Interval**: How often to fetch news (600-7200 seconds, default 1800)
-   - **TTS Entity**: Select your TTS entity
-   - **Media Players**: Select one or more media players
    - **AI Mode**: Choose "auto", "google_generative_ai_conversation", or "conversation"
    - **Conversation Agent ID**: Required if AI mode is "conversation"
-   - **Pre-roll Delay**: Delay in milliseconds before speaking (0-300)
    - **Enabled Categories**: Toggle which categories to include
+   - **Custom News Sources**: Add custom query-based news sources
 
 ## Usage
 
@@ -104,8 +98,8 @@ The integration creates sensor entities for each news category:
 Each sensor provides:
 - **State**: Number of articles in that category
 - **Attributes**: 
-  - `articles`: List of articles with `title` and `summary`
-  - `article_count`: Total number of articles
+  - `Story 1 Title`, `Story 1 Article`, `Story 2 Title`, `Story 2 Article`, etc. (up to 10 stories)
+  - Each story has a title and full article content scraped from the source
 
 You can use these sensors in automations, templates, and dashboards to display news data.
 
@@ -118,41 +112,10 @@ The integration includes an intuitive panel interface built with Shoelace web co
 
 The panel allows you to:
 - Configure all settings visually
-- Test briefings with the "Play Briefing Now" button
+- Manually refresh news data with the "Refresh News Data" button
 - See real-time status and error messages
 - Toggle news categories on/off
-- Select TTS entities and media players from dropdowns
-
-### Service Call
-
-Call the service directly:
-
-```yaml
-service: home_assistant_news.play_briefing
-```
-
-With optional overrides:
-
-```yaml
-service: home_assistant_news.play_briefing
-data:
-  override_max_per_category: 1
-  override_media_players:
-    - media_player.living_room
-  override_preroll_ms: 200
-```
-
-### Automation Example
-
-```yaml
-alias: Morning News Briefing
-trigger:
-  - platform: time
-    at: "07:30:00"
-action:
-  - service: home_assistant_news.play_briefing
-mode: single
-```
+- Add and manage custom news sources
 
 ### Using Sensor Entities
 
@@ -163,7 +126,7 @@ You can use the sensor entities in automations and templates:
 {{ states('sensor.home_assistant_news_u_s') }} articles in U.S. news
 
 # Example: Get first article title
-{{ state_attr('sensor.home_assistant_news_world', 'articles')[0].title if state_attr('sensor.home_assistant_news_world', 'articles') else 'No articles' }}
+{{ state_attr('sensor.home_assistant_news_world', 'Story 1 Title') if state_attr('sensor.home_assistant_news_world', 'Story 1 Title') else 'No articles' }}
 
 # Example: Automation triggered by new articles
 alias: Notify on New Technology News
@@ -173,50 +136,22 @@ trigger:
 action:
   - service: notify.mobile_app
     data:
-      message: "New tech news: {{ state_attr('sensor.home_assistant_news_technology', 'articles')[0].title }}"
-```
-
-### Multiple Times Per Day
-
-```yaml
-alias: Daily News Briefings
-trigger:
-  - platform: time
-    at: "07:30:00"
-  - platform: time
-    at: "12:00:00"
-  - platform: time
-    at: "18:00:00"
-action:
-  - service: home_assistant_news.play_briefing
-mode: single
+      message: "New tech news: {{ state_attr('sensor.home_assistant_news_technology', 'Story 1 Title') }}"
 ```
 
 ## How It Works
 
-1. The integration fetches RSS feeds from Google News for enabled categories
-2. Articles are parsed and cleaned (HTML removed, whitespace collapsed)
-3. A JSON payload is built with article titles and summaries
-4. An AI prompt is constructed with strict formatting rules
-5. The AI service generates a broadcast-style script
-6. The script is spoken on configured media players using TTS
-
-## Script Format
-
-The generated script follows this format:
-
-- Greeting: "Good morning," / "Good afternoon," / "Good night," (based on local time)
-- For each category: "in the world of <Category>,"
-- For each article: A 5-12 word title-style summary, followed by a concise paragraph
-- Between articles: "Next up,"
-- No links, markdown, or source attributions
+1. The integration fetches RSS feeds from Google News for enabled categories and custom sources
+2. Articles are parsed and full article content is scraped from the source URLs
+3. Article data is stored in sensor entities with attributes for each story
+4. Sensors are updated automatically based on the configured scan interval
+5. You can manually refresh data using the panel UI or by calling the refresh API endpoint
 
 ## Troubleshooting
 
-- **No items to brief**: Check that at least one category is enabled and RSS feeds are accessible
-- **AI service error**: Ensure Google Generative AI Conversation is set up, or configure a Conversation agent
-- **TTS errors**: Verify your TTS entity is configured correctly
-- **Media player errors**: Check that media player entities exist and are available
+- **No articles in sensors**: Check that at least one category is enabled and RSS feeds are accessible
+- **Articles not loading**: The integration scrapes full article content from URLs. Some sites may block scraping. Check logs for errors.
+- **Panel not showing**: Ensure the panel.html file is copied to `config/www/home_assistant_news/panel.html` and restart Home Assistant
 
 ## License
 
