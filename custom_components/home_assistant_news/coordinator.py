@@ -342,14 +342,14 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                     # Fallback to basic extraction if readability is not available
                     result = self._basic_extract_article(html_content)
                     if not result:
-                        _LOGGER.warning("Both readability and basic extraction failed for %s", url)
+                        _LOGGER.debug("Both readability and basic extraction failed for %s, will use RSS description", url)
                     return result
                 except Exception as err:
                     _LOGGER.debug("Readability extraction failed for %s: %s, trying fallback", url, err)
                     # Fallback to basic extraction
                     result = self._basic_extract_article(html_content)
                     if not result:
-                        _LOGGER.warning("Both readability and basic extraction failed for %s: %s", url, err)
+                        _LOGGER.debug("Both readability and basic extraction failed for %s: %s, will use RSS description", url, err)
                     return result
                 
         except Exception as err:
@@ -445,7 +445,7 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 _LOGGER.debug("Basic extraction succeeded (%d chars)", len(content))
                 return content
             else:
-                _LOGGER.warning("Basic extraction produced insufficient content (%d chars)", len(content) if content else 0)
+                _LOGGER.debug("Basic extraction produced insufficient content (%d chars), will use RSS description", len(content) if content else 0)
                 return ""
         except Exception as err:
             _LOGGER.warning("Basic extraction failed: %s", err, exc_info=True)
