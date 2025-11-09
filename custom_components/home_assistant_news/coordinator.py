@@ -335,12 +335,16 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                     if len(article_text) > 5000:
                         article_text = article_text[:5000] + "..."
                     
-                    if article_text:
+                    if article_text and len(article_text) > 100:
                         _LOGGER.debug("Successfully scraped article from %s (%d chars)", url, len(article_text))
                         return article_text
                     else:
-                        _LOGGER.warning("Readability extracted empty content from %s", url)
-                        return ""
+                        _LOGGER.debug("Readability extracted insufficient content from %s (%d chars), trying fallback", url, len(article_text) if article_text else 0)
+                        # Fallback to basic extraction if readability didn't work well
+                        result = self._basic_extract_article(html_content)
+                        if result and len(result) > 100:
+                            return result
+                        return article_text if article_text else ""
                         
                 except ImportError:
                     _LOGGER.debug("readability-lxml not available, falling back to basic extraction for %s", url)
