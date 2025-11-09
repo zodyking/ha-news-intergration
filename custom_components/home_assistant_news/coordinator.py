@@ -255,13 +255,19 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                         return ""
                         
                 except ImportError:
-                    _LOGGER.warning("readability-lxml not available, falling back to basic extraction")
+                    _LOGGER.debug("readability-lxml not available, falling back to basic extraction for %s", url)
                     # Fallback to basic extraction if readability is not available
-                    return self._basic_extract_article(html_content)
+                    result = self._basic_extract_article(html_content)
+                    if not result:
+                        _LOGGER.warning("Both readability and basic extraction failed for %s", url)
+                    return result
                 except Exception as err:
-                    _LOGGER.warning("Readability extraction failed for %s: %s, trying fallback", url, err)
+                    _LOGGER.debug("Readability extraction failed for %s: %s, trying fallback", url, err)
                     # Fallback to basic extraction
-                    return self._basic_extract_article(html_content)
+                    result = self._basic_extract_article(html_content)
+                    if not result:
+                        _LOGGER.warning("Both readability and basic extraction failed for %s: %s", url, err)
+                    return result
                 
         except Exception as err:
             _LOGGER.warning("Failed to scrape article from %s: %s", url, err)
@@ -273,42 +279,67 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
             # Remove script and style tags
             html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
             html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            html_content = re.sub(r'<noscript[^>]*>.*?</noscript>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
             
-            # Try to extract from common article tags
+            # Try to extract from common article tags (more patterns)
             article_patterns = [
                 r'<article[^>]*>(.*?)</article>',
                 r'<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
                 r'<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*class="[^"]*post[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*class="[^"]*entry[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*id="[^"]*content[^"]*"[^>]*>(.*?)</div>',
+                r'<div[^>]*id="[^"]*article[^"]*"[^>]*>(.*?)</div>',
                 r'<main[^>]*>(.*?)</main>',
+                r'<section[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</section>',
             ]
             
             content = ""
             for pattern in article_patterns:
                 matches = re.findall(pattern, html_content, re.DOTALL | re.IGNORECASE)
                 if matches:
-                    content = matches[0]
-                    break
+                    # Get the longest match (likely the main content)
+                    content = max(matches, key=len)
+                    if len(content) > 200:  # Only use if substantial content
+                        break
             
-            if not content:
-                # Fallback: extract from body
+            if not content or len(content) < 200:
+                # Fallback: extract from body, but exclude common non-content elements
                 body_match = re.search(r'<body[^>]*>(.*?)</body>', html_content, re.DOTALL | re.IGNORECASE)
                 if body_match:
-                    content = body_match.group(1)
+                    body_content = body_match.group(1)
+                    # Remove navigation, header, footer, sidebar
+                    body_content = re.sub(r'<nav[^>]*>.*?</nav>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    body_content = re.sub(r'<header[^>]*>.*?</header>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    body_content = re.sub(r'<footer[^>]*>.*?</footer>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    body_content = re.sub(r'<aside[^>]*>.*?</aside>', '', body_content, flags=re.DOTALL | re.IGNORECASE)
+                    content = body_content
             
-            # Strip HTML tags
+            # Strip HTML tags but preserve paragraph breaks
+            content = re.sub(r'</p>', '\n\n', content, flags=re.IGNORECASE)
+            content = re.sub(r'</div>', '\n', content, flags=re.IGNORECASE)
+            content = re.sub(r'<br[^>]*>', '\n', content, flags=re.IGNORECASE)
             content = re.sub(r'<[^>]+>', ' ', content)
+            
             # Decode HTML entities
             content = html.unescape(content)
-            # Collapse whitespace
-            content = re.sub(r'\s+', ' ', content)
+            
+            # Clean up whitespace
+            content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)  # Max 2 consecutive newlines
+            content = re.sub(r'[ \t]+', ' ', content)  # Collapse spaces
             content = content.strip()
             
             # Limit to reasonable length (5000 chars)
             if len(content) > 5000:
                 content = content[:5000] + "..."
             
-            return content
+            if content and len(content) > 50:
+                _LOGGER.debug("Basic extraction succeeded (%d chars)", len(content))
+                return content
+            else:
+                _LOGGER.warning("Basic extraction produced insufficient content (%d chars)", len(content) if content else 0)
+                return ""
         except Exception as err:
-            _LOGGER.warning("Basic extraction failed: %s", err)
+            _LOGGER.warning("Basic extraction failed: %s", err, exc_info=True)
             return ""
 
