@@ -34,16 +34,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.http.register_view(AINewsAnchorConfigView)
         hass.http.register_view(AINewsAnchorRefreshView)
         
-        # Register static path for panel HTML
-        panel_path = os.path.join(
-            os.path.dirname(__file__), "www", "home_assistant_news", "panel.html"
-        )
-        if os.path.exists(panel_path):
-            hass.http.register_static_path(
-                "/local/home_assistant_news/panel.html",
-                panel_path,
-                cache_headers=False,
-            )
+        # Register view to serve panel HTML
+        hass.http.register_view(AINewsAnchorPanelView)
         
         hass.data[DOMAIN]["_views_registered"] = True
     
