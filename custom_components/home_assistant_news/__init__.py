@@ -23,30 +23,6 @@ PLATFORMS: list[str] = ["sensor"]
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Home Assistant News integration."""
     hass.data.setdefault(DOMAIN, {})
-    
-    # Register panel with frontend
-    try:
-        from homeassistant.components.frontend import async_register_built_in_panel
-        async_register_built_in_panel(
-            hass,
-            component_name="custom",
-            sidebar_title="Home Assistant News",
-            sidebar_icon="mdi:newspaper-variant-multiple",
-            frontend_url_path="home_assistant_news",
-            config={
-                "_panel_custom": {
-                    "name": "home-assistant-news-panel",
-                    "embed_iframe": True,
-                    "trust_external": False,
-                    "js_url": "/local/home_assistant_news/panel.html",
-                }
-            },
-            require_admin=False,
-        )
-        _LOGGER.info("Panel registered with frontend")
-    except Exception as err:
-        _LOGGER.warning("Could not register panel with frontend: %s", err)
-    
     return True
 
 
