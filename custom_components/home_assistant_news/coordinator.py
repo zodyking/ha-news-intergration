@@ -214,8 +214,6 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 
                 # Extract article content using basic HTML parsing
                 # Try to find main content areas
-                import re
-                
                 # Remove script and style tags
                 text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
                 text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
