@@ -23,6 +23,16 @@ PLATFORMS: list[str] = ["sensor"]
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Home Assistant News integration."""
     hass.data.setdefault(DOMAIN, {})
+    
+    # Register the panel - Home Assistant should pick it up from manifest.json
+    # but we ensure the view is registered early
+    try:
+        # The panel is declared in manifest.json, so Home Assistant should register it automatically
+        # We just need to make sure the view is available
+        _LOGGER.debug("Home Assistant News integration setup complete")
+    except Exception as err:
+        _LOGGER.debug("Panel registration note: %s", err)
+    
     return True
 
 

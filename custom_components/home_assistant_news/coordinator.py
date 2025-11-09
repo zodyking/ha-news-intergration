@@ -214,13 +214,8 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                 description_html = ""
                 if desc_elem is not None and desc_elem.text:
                     description_html = desc_elem.text.strip()
-                    description = html.unescape(description_html)
-                    # Clean HTML from description for text-only version
-                    description_text = re.sub(r'<[^>]+>', ' ', description)
-                    description_text = re.sub(r'\s+', ' ', description_text).strip()
-                    description = description_text
                     
-                    # Extract article link from description HTML
+                    # Extract article link from description HTML FIRST (before processing)
                     # All links are Google News redirects, but description may have a different/better redirect URL
                     # Look for <a href="..." in the description
                     href_match = re.search(r'<a[^>]*href=["\']([^"\']+)["\']', description_html, re.IGNORECASE)
@@ -231,6 +226,18 @@ class NewsCoordinator(DataUpdateCoordinator[dict[str, list[dict[str, str]]]]):
                         if extracted_link:
                             link = extracted_link
                             _LOGGER.debug("Using article URL from description: %s", link)
+                    
+                    # Now extract text content from description
+                    # First unescape HTML entities
+                    description = html.unescape(description_html)
+                    # Remove HTML tags but preserve text content
+                    # Replace <br>, <p>, </p> with spaces first
+                    description = re.sub(r'<br[^>]*>', ' ', description, flags=re.IGNORECASE)
+                    description = re.sub(r'</?p[^>]*>', ' ', description, flags=re.IGNORECASE)
+                    # Remove all other HTML tags
+                    description = re.sub(r'<[^>]+>', ' ', description)
+                    # Clean up whitespace
+                    description = re.sub(r'\s+', ' ', description).strip()
 
                 if title:
                     articles.append({"title": title, "link": link, "summary": "", "description": description})
